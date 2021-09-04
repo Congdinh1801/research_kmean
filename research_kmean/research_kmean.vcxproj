@@ -139,7 +139,10 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="testmain.cpp" />
+    <ClCompile Include="skeleton.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="4.2.03.ppm" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
