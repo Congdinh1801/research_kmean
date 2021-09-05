@@ -57,7 +57,7 @@ typedef struct
 #define LOWER_MASK 0x7fffffffUL /* least significant r bits */
 #define MAX_RGB_DIST 195075		/*max number of rgb in 1D 255*255*3 = 195075*/
 #define MAX_ITERS 100		/*default 100 I: maximum number of iterations in a run*/
-#define MAX_RUN 5	/*DEFAULT IS 100*/
+//#define MAX_RUN 5	/*DEFAULT IS 100*/
 #define T 0.000001 /*(convergence threshold)*/
 
 //my defined number
@@ -352,7 +352,7 @@ void batch_kmeans(const RGB_Image* img, const int k,
 	//RGB_Pixel* centers_temp = (RGB_Pixel*)malloc(k * sizeof(RGB_Pixel)); /*temporary centers of clusters in current iteration*/
 	///*double dist_cluster[k] = {0};*/
 	//double* dist_cluster = (double*)malloc(k * sizeof(double));
-
+	double current_T = 1000;  //initilized a number greater than T
 	double SSE_past = 0; 
 	double SSE = 0; //first one is the past, second one is current
 	int size_img = *(&img->size);
@@ -443,7 +443,7 @@ void batch_kmeans(const RGB_Image* img, const int k,
 			continue;
 		}
 
-		double current_T = (SSE_past - SSE) / SSE_past;
+		current_T = (SSE_past - SSE) / SSE_past;
 		SSE_past = SSE;
 		//printf("SSE = %0.4f\n", SSE);
 		printf("Iteration %d: SSE = %0.4f\n", counter_test+1, SSE);
@@ -455,32 +455,58 @@ void batch_kmeans(const RGB_Image* img, const int k,
 			break;
 		}
 
-		////testing 
-		//unsigned int size_total = 0;
-		//for (int i = 0; i < k; i++) {
-		//	if ((clusters + i)->size == 0) {
-		//		printf("cluster %d has size 0, skip\n\n", i);
-		//		continue;
-		//	}
-		//	printf("Cluster %d's size is %d \n", i, clusters[i].size);
-		//	size_total += clusters[i].size;
-		//	cout << "Cluster " << i << "'s center is: " << (clusters + i)->center.red << "," << (clusters + i)->center.green << "," << (clusters + i)->center.blue << endl << endl;
-		//}
-		//cout << "size_total is: " << size_total << endl;
-		//if (num_pixels != size_total) {
-		//	printf("the size total is different. Should be 262144\n");
-		//}
+		//When the condition met, save the image with k colors (in progress)
+		if (counter_test < max_iters-1 || current_T >= T) {		
+			//loop to go over all pixels
+			for (int i = 0; i < size_img; i++) {	//size_img
+				//3.1 calculate distance of each pixel to each centroid using Squared Euclidean distance
+				double r = *(&img->data[i].red);
+				double g = *(&img->data[i].green);
+				double b = *(&img->data[i].blue);
+
+				//cout << "\nrgb is: " << r << "," << g << "," << b << endl; //testing
+
+				for (int j = 0; j < k; j++) {
+					dist_cluster[j] = (r - (clusters + j)->center.red) * (r - (clusters + j)->center.red)
+						+ (g - (clusters + j)->center.green) * (g - (clusters + j)->center.green)
+						+ (b - (clusters + j)->center.blue) * (b - (clusters + j)->center.blue);
+					//cout << "distance is: " << dist_cluster[j] << endl; //testing
+				}
+				//3.2 assign each pixel to the nearest centroid
+				int ind = 0;
+				double min = dist_cluster[0];
+				for (int i = 0; i < k; i++) {
+					if (dist_cluster[i] < min) {
+						min = dist_cluster[i];
+						ind = i;
+					}
+				}
+				
+				//save the image with k colors
+				*(&img->data[i].red) = (clusters + ind)->center.red;
+				*(&img->data[i].green) = (clusters + ind)->center.green;
+				*(&img->data[i].blue) = (clusters + ind)->center.blue;
+			}
+		}
+	
 	
 
-		// Free the memory
+		// Free the memory 
 		free(dist_cluster);
 		// Free the memory
 		free(centers_temp);
 
 		counter_test++;
 	}
+
+	//outside while loop, after finish 
+	/*for (int i = 0; i < size_img; i++) {
+
+	}*/
+
+
 	//testing 
-	/*unsigned int size_total = 0;
+	unsigned int size_total = 0;
 	cout << "\n\nResulted clusters are: " << endl;
 	for (int i = 0; i < k; i++) {
 		if ((clusters + i)->size == 0) {
@@ -494,9 +520,9 @@ void batch_kmeans(const RGB_Image* img, const int k,
 	cout << "size_total is: " << size_total << endl;
 	if (num_pixels != size_total) {
 		printf("the size total is different. Should be 262144\n");
-	}*/
+	}
 	
-	//// Free the memory
+	//// Free the memory (use upper)
 	//free(dist_cluster);
 	//// Free the memory
 	//free(centers_temp);
@@ -517,14 +543,18 @@ int main(int argc, char* argv[])
 	//skeleton.cpp data_file num_clusters Max_run thresh_hold num_runs
 	//skeleton.cpp ecoli.txt 8 100 0.000001 3
 	//skeleton.cpp ecoli.txt 8 100 0.000001 3
-	const char* filename = "sample_image.ppm";	/* Filename Pointer*/
-	int k = 5;								/* Number of clusters*/
+	
+	//const char* filename;	//"sample_image.ppm" /* Filename Pointer*/ 
+	//int k;		//5			/* Number of clusters
+	
+	const char* filename = "sample_image.ppm";	//"sample_image.ppm" /* Filename Pointer*/ 
+	int k = 2;		//5			/* Number of clusters*/
 	RGB_Image* img;
 	RGB_Image* out_img;
 	RGB_Cluster* cluster;
 
 	//initialized cluster
-
+	//cluster = gen_rand_centers(img, k);
 
 	//if (argc == 3) {
 	//	/* Image filename */
@@ -551,24 +581,26 @@ int main(int argc, char* argv[])
 	/* Read Image*/
 	img = read_PPM(filename);
 
-	cout << endl;
+	//testing
+	/*cout << endl;
 	cout << "image is: " << img << endl;
 	cout << "img->width:  " << img->width << endl;
 	cout << "img->height: " << img->height << endl;
-	cout << "img->size: " << img->size << endl;
+	cout << "img->size: " << img->size << endl;*/
 
 
 	/*cout << *(&img->data[num_pixels+5].red) << endl;
 	cout << *(&img->data[num_pixels+5].green) << endl;
 	cout << *(&img->data[num_pixels+5].blue) << endl << endl;*/
 
-	for (int i = 0; i < 3; i++) {
+	//testing
+	/*for (int i = 0; i < 3; i++) {
 		cout << i << " pixel: " << *(&img->data[i].red) << "," << *(&img->data[i].green)
 			<< "," << *(&img->data[i].blue) << endl;
 	}
 
 	cout << "first pixel address is: " << &img->data[0].red << "," << &img->data[0].green << "," << &img->data[0].blue << "," << endl;
-	cout << "second pixel address is: " << &img->data[1].red << "," << &img->data[1].green << "," << &img->data[1].blue << "," << endl;
+	cout << "second pixel address is: " << &img->data[1].red << "," << &img->data[1].green << "," << &img->data[1].blue << "," << endl;*/
 
 
 	/* Test Batch K-Means*/
@@ -588,13 +620,14 @@ int main(int argc, char* argv[])
 	//}
 
 	/* Implement Batch K-means*/
-	for (int i = 0; i < MAX_RUN; i++) {
-		printf("\nRun %d\n-------\n", i+1);
-		cluster = gen_rand_centers(img, k);
-		batch_kmeans(img, k, MAX_ITERS, cluster);
-		cout << "\n------------------Finished running--------------------" << endl << endl;
-	}
+
+	cluster = gen_rand_centers(img, k);
+	batch_kmeans(img, k, MAX_ITERS, cluster);
+	cout << "\n------------------Finished running--------------------" << endl << endl;
+
 	
+	//Make new image with only k colors
+	write_PPM(img, "outputimg.ppm");
 
 	/* Stop Timer*/
 	auto stop = std::chrono::high_resolution_clock::now();
