@@ -19,9 +19,4 @@
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
-  <ItemGroup>
-    <None Include="4.2.03.ppm">
-      <Filter>Source Files</Filter>
-    </None>
-  </ItemGroup>
 </Project>

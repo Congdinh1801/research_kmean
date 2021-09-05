@@ -448,15 +448,53 @@ void batch_kmeans(const RGB_Image* img, const int k,
 		//printf("SSE = %0.4f\n", SSE);
 		printf("Iteration %d: SSE = %0.4f\n", counter_test+1, SSE);
 		//cout << "relative improvement in SSE = " << current_T << endl;
+		
+		//when relative improvement in SSE is less than threshhold T, save the image, and stop the loop
 		if (current_T < T) 
 		{
+			//save the image with k colors 
+			//loop to go over all pixels
+			for (int i = 0; i < size_img; i++) {	//size_img
+				//3.1 calculate distance of each pixel to each centroid using Squared Euclidean distance
+				double r = *(&img->data[i].red);
+				double g = *(&img->data[i].green);
+				double b = *(&img->data[i].blue);
+
+				//cout << "\nrgb is: " << r << "," << g << "," << b << endl; //testing
+
+				for (int j = 0; j < k; j++) {
+					dist_cluster[j] = (r - (clusters + j)->center.red) * (r - (clusters + j)->center.red)
+						+ (g - (clusters + j)->center.green) * (g - (clusters + j)->center.green)
+						+ (b - (clusters + j)->center.blue) * (b - (clusters + j)->center.blue);
+					//cout << "distance is: " << dist_cluster[j] << endl; //testing
+				}
+				//3.2 assign each pixel to the nearest centroid
+				int ind = 0;
+				double min = dist_cluster[0];
+				for (int i = 0; i < k; i++) {
+					if (dist_cluster[i] < min) {
+						min = dist_cluster[i];
+						ind = i;
+					}
+				}
+
+				//save the image with k colors
+				*(&img->data[i].red) = (clusters + ind)->center.red;
+				*(&img->data[i].green) = (clusters + ind)->center.green;
+				*(&img->data[i].blue) = (clusters + ind)->center.blue;
+			}
+
 			//cout << "threshhold reached when " << current_T << " < T(" << T << ")"; //another way
 			printf("threshhold reached when %.9f < T(%0.6f)", current_T, T); //test
+			// Free the memory 
+			free(dist_cluster);
+			// Free the memory
+			free(centers_temp);
 			break;
 		}
 
-		//When the condition met, save the image with k colors (in progress)
-		if (counter_test < max_iters-1 || current_T >= T) {		
+		//When this is the last iteration, save the image with k colors 
+		if (counter_test == max_iters-1) {
 			//loop to go over all pixels
 			for (int i = 0; i < size_img; i++) {	//size_img
 				//3.1 calculate distance of each pixel to each centroid using Squared Euclidean distance
@@ -488,8 +526,7 @@ void batch_kmeans(const RGB_Image* img, const int k,
 				*(&img->data[i].blue) = (clusters + ind)->center.blue;
 			}
 		}
-	
-	
+
 
 		// Free the memory 
 		free(dist_cluster);
@@ -499,14 +536,8 @@ void batch_kmeans(const RGB_Image* img, const int k,
 		counter_test++;
 	}
 
-	//outside while loop, after finish 
-	/*for (int i = 0; i < size_img; i++) {
-
-	}*/
-
-
 	//testing 
-	unsigned int size_total = 0;
+	/*unsigned int size_total = 0;
 	cout << "\n\nResulted clusters are: " << endl;
 	for (int i = 0; i < k; i++) {
 		if ((clusters + i)->size == 0) {
@@ -520,7 +551,7 @@ void batch_kmeans(const RGB_Image* img, const int k,
 	cout << "size_total is: " << size_total << endl;
 	if (num_pixels != size_total) {
 		printf("the size total is different. Should be 262144\n");
-	}
+	}*/
 	
 	//// Free the memory (use upper)
 	//free(dist_cluster);
@@ -544,34 +575,35 @@ int main(int argc, char* argv[])
 	//skeleton.cpp ecoli.txt 8 100 0.000001 3
 	//skeleton.cpp ecoli.txt 8 100 0.000001 3
 	
-	//const char* filename;	//"sample_image.ppm" /* Filename Pointer*/ 
-	//int k;		//5			/* Number of clusters
+	const char* filename;	//"sample_image.ppm" /* Filename Pointer*/ 
+	int k;		//5			/* Number of clusters
 	
-	const char* filename = "sample_image.ppm";	//"sample_image.ppm" /* Filename Pointer*/ 
-	int k = 2;		//5			/* Number of clusters*/
+	//const char* filename = "sample_image.ppm";	//"sample_image.ppm" /* Filename Pointer*/ 
+	//int k = 2;		//5			/* Number of clusters*/
+
 	RGB_Image* img;
-	RGB_Image* out_img;
+	//RGB_Image* out_img;
 	RGB_Cluster* cluster;
 
 	//initialized cluster
 	//cluster = gen_rand_centers(img, k);
 
-	//if (argc == 3) {
-	//	/* Image filename */
-	//	filename = argv[1];
+	if (argc == 3) {
+		/* Image filename */
+		filename = argv[1];
 
-	//	/* k, number of clusters */
-	//	k = atoi(argv[2]); // atoi function converts a string to an integer
+		/* k, number of clusters */
+		k = atoi(argv[2]); // atoi function converts a string to an integer
 
-	//}
-	//else if (argc > 3) {
-	//	printf("Too many arguments supplied.\n");
-	//	return 0;
-	//}
-	//else {
-	//	printf("Two arguments expected: image filename and number of clusters.\n");
-	//	return 0;
-	//}
+	}
+	else if (argc > 3) {
+		printf("Too many arguments supplied.\n");
+		return 0;
+	}
+	else {
+		printf("Two arguments expected: image filename and number of clusters.\n");
+		return 0;
+	}
 
 	srand(time(NULL));
 
