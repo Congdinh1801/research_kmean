@@ -11,10 +11,10 @@ a. Original picture
 
 b. Applied batch k mean with k = 2
 <p>
-<img width="256" src="./img/outputting_img.jpg">
+<img width="256" src="./img/outputting_img_2.jpg">
 </p>
 
-b. Applied batch k mean with k = 3
+c. Applied batch k mean with k = 3
 <p>
 <img width="256" src="./img/outputting_img_3.jpg">
 </p>
