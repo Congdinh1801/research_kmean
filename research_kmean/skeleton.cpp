@@ -659,7 +659,7 @@ int main(int argc, char* argv[])
 
 	
 	//Make new image with only k colors
-	write_PPM(img, "outputimg.ppm");
+	write_PPM(img, "outputting_img.ppm");
 
 	/* Stop Timer*/
 	auto stop = std::chrono::high_resolution_clock::now();
