@@ -6,10 +6,15 @@
 ## Sample results 
 a. Original picture
 <p>
-<img width="416" src="sample_image.ppm">
+<img width="256" src="./img/sample_image.jpg">
 </p>
 
 b. Applied batch k mean with k = 2
 <p>
-<img width="416" src="outputting_img.ppm">
+<img width="256" src="./img/outputting_img.jpg">
+</p>
+
+b. Applied batch k mean with k = 3
+<p>
+<img width="256" src="./img/outputting_img_3.jpg">
 </p>
