@@ -658,6 +658,8 @@ int main(int argc, char* argv[])
 	cout << "\n------------------Finished running--------------------" << endl << endl;
 
 	
+	//string output_img_name = "outputting_img_" + to_string(k) + ".ppm"; //testing
+
 	//Make new image with only k colors
 	write_PPM(img, "outputting_img.ppm");
 
