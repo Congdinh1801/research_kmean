@@ -18,3 +18,9 @@ c. Applied batch k mean with k = 3
 <p>
 <img width="256" src="./img/outputting_img_3.jpg">
 </p>
+
+d. Run time
+<p>
+k = 2 <img width="256" src="./img/runtime_2.JPG">
+k = 3 <img width="256" src="./img/runtime_3.JPG">
+</p>
