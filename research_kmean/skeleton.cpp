@@ -333,40 +333,18 @@ RGB_Cluster* gen_rand_centers(const RGB_Image* img, const int k) {
 void batch_kmeans(const RGB_Image* img, const int k,
 	const int max_iters, RGB_Cluster* clusters)
 {
-	//batch_kmeans(img, k, INT_MAX, cluster);
-	//printf("Cluster %d's size is %d \n", i, *(&cluster->size));
-	////printf("Cluster %d's center is %d %d %d \n", i, (cluster+i)->center.red, (cluster + i)->center.green, (cluster + i)->center.blue);
-	//cout << "Cluster " << i << "'s center is: " << (cluster + i)->center.red << "," << (cluster + i)->center.green << "," << (cluster + i)->center.blue << endl << endl;
-
-	
-	/*RGB_Pixel two_d[2][2];
-	vector<RGB_Pixel> cluster0;
-	vector<RGB_Pixel> cluster1;
-	vector<RGB_Pixel> cluster2;*/
-	//step 1 aldready done
-
+	//step 1: initializing random centroids (aldready done in main)
 	//Declare variables
 	int counter_test = 0;
-
-	////RGB_Pixel centers_temp[3] = {0}; 
-	//RGB_Pixel* centers_temp = (RGB_Pixel*)malloc(k * sizeof(RGB_Pixel)); /*temporary centers of clusters in current iteration*/
-	///*double dist_cluster[k] = {0};*/
-	//double* dist_cluster = (double*)malloc(k * sizeof(double));
 	double current_T = 1000;  //initilized a number greater than T
 	double SSE_past = 0; 
 	double SSE = 0; //first one is the past, second one is current
-	int size_img = *(&img->size);
-	//cout << "size of image is: " << size_img;
+	int size_img = *(&img->size); 
+	//cout << "size of image is: " << size_img; //testing
 
-	//testing for initial clusters' centers
-	//cout << "Initial clusters' centers are: " << endl;
-	//for (int i = 0; i < k; i++) {
-	//	printf("Cluster %d's size is %d \n", i, *(&clusters->size));
-	//	//printf("Cluster %d's center is %d %d %d \n", i, (cluster+i)->center.red, (cluster + i)->center.green, (cluster + i)->center.blue);
-	//	cout << "Cluster " << i << "'s center is: " << (clusters + i)->center.red << "," << (clusters + i)->center.green << "," << (clusters + i)->center.blue << endl << endl;
-	//}
-
-	while (counter_test < max_iters) /*step2: loop and Stop when relative improvement in SSE(Sum of Squared Error) between two consecutive iterations drops below T, threshold or reached maximum iteration*/
+	/*step2: loop and Stop when relative improvement in SSE(Sum of Squared Error) between \
+	two consecutive iterations drops below T, threshold or reached maximum iteration*/
+	while (counter_test < max_iters) 
 	{
 		//RGB_Pixel centers_temp[3] = {0}; 
 		RGB_Pixel* centers_temp = (RGB_Pixel*)malloc(k * sizeof(RGB_Pixel)); /*temporary centers of clusters in current iteration*/
@@ -378,7 +356,7 @@ void batch_kmeans(const RGB_Image* img, const int k,
 		//reset SSE
 		SSE = 0;
 		
-		//step3: Assign each pixel to cluster
+		//step 3: Assign each pixel to cluster
 		//reset the size of each cluster and centers_temp	
 		for (int i = 0; i < k; i++) {
 			clusters[i].size = 0;
@@ -414,7 +392,7 @@ void batch_kmeans(const RGB_Image* img, const int k,
 					ind = i;
 				}
 			}
-			//int ind = std::distance(dist_cluster, max_element(dist_cluster, dist_cluster + sizeof(dist_cluster) / sizeof(dist_cluster[0])));
+			//int ind = std::distance(dist_cluster, max_element(dist_cluster, dist_cluster + sizeof(dist_cluster) / sizeof(dist_cluster[0]))); //testing for other way (not working)
 			//cout << "Nearest centroid is: " << ind << endl; //testing
 			centers_temp[ind].red += r;
 			centers_temp[ind].green += g;
@@ -424,7 +402,7 @@ void batch_kmeans(const RGB_Image* img, const int k,
 			SSE += min;			
 		}
 
-		//step4: Recompute the cetroid of each cluster
+		//step 4: Recompute the cetroid of each cluster
 		for (int i = 0; i < k; i++) {
 			(clusters + i)->center.red = centers_temp[i].red / clusters[i].size;
 			(clusters + i)->center.green = centers_temp[i].green / clusters[i].size;
@@ -439,7 +417,7 @@ void batch_kmeans(const RGB_Image* img, const int k,
 			printf("Iteration %d: SSE = %0.4f\n", counter_test + 1, SSE);
 			counter_test++;
 			//printf("SSE = %0.4f\n", SSE);
-			//cout << "Current threshhold is ignored (first iteration) " << endl; //test
+			//cout << "Current threshhold is ignored (first iteration) " << endl; //testing
 			continue;
 		}
 
@@ -449,8 +427,8 @@ void batch_kmeans(const RGB_Image* img, const int k,
 		printf("Iteration %d: SSE = %0.4f\n", counter_test+1, SSE);
 		//cout << "relative improvement in SSE = " << current_T << endl;
 		
-		//when relative improvement in SSE is less than threshhold T, save the image, and stop the loop
-		if (current_T < T) 
+		//step 5: If relative improvement in SSE is less than threshhold T or this is the last iteration, save the image, and stop the loop
+		if (current_T < T || counter_test == max_iters - 1)
 		{
 			//save the image with k colors 
 			//loop to go over all pixels
@@ -485,78 +463,19 @@ void batch_kmeans(const RGB_Image* img, const int k,
 			}
 
 			//cout << "threshhold reached when " << current_T << " < T(" << T << ")"; //another way
-			printf("threshhold reached when %.9f < T(%0.6f)", current_T, T); //test
+			printf("threshhold reached when %.9f < T(%0.6f)", current_T, T); //maybe for testing
 			// Free the memory 
 			free(dist_cluster);
-			// Free the memory
 			free(centers_temp);
 			break;
 		}
 
-		//When this is the last iteration, save the image with k colors 
-		if (counter_test == max_iters-1) {
-			//loop to go over all pixels
-			for (int i = 0; i < size_img; i++) {	//size_img
-				//3.1 calculate distance of each pixel to each centroid using Squared Euclidean distance
-				double r = *(&img->data[i].red);
-				double g = *(&img->data[i].green);
-				double b = *(&img->data[i].blue);
-
-				//cout << "\nrgb is: " << r << "," << g << "," << b << endl; //testing
-
-				for (int j = 0; j < k; j++) {
-					dist_cluster[j] = (r - (clusters + j)->center.red) * (r - (clusters + j)->center.red)
-						+ (g - (clusters + j)->center.green) * (g - (clusters + j)->center.green)
-						+ (b - (clusters + j)->center.blue) * (b - (clusters + j)->center.blue);
-					//cout << "distance is: " << dist_cluster[j] << endl; //testing
-				}
-				//3.2 assign each pixel to the nearest centroid
-				int ind = 0;
-				double min = dist_cluster[0];
-				for (int i = 0; i < k; i++) {
-					if (dist_cluster[i] < min) {
-						min = dist_cluster[i];
-						ind = i;
-					}
-				}
-				
-				//save the image with k colors
-				*(&img->data[i].red) = (clusters + ind)->center.red;
-				*(&img->data[i].green) = (clusters + ind)->center.green;
-				*(&img->data[i].blue) = (clusters + ind)->center.blue;
-			}
-		}
-
-
 		// Free the memory 
 		free(dist_cluster);
-		// Free the memory
 		free(centers_temp);
 
 		counter_test++;
 	}
-
-	//testing 
-	/*unsigned int size_total = 0;
-	cout << "\n\nResulted clusters are: " << endl;
-	for (int i = 0; i < k; i++) {
-		if ((clusters + i)->size == 0) {
-			printf("cluster %d has size 0, skip\n\n", i);
-			continue;
-		}
-		printf("Cluster %d's size is %d \n", i, clusters[i].size);
-		size_total += clusters[i].size;
-		cout << "Cluster " << i << "'s center is: " << (clusters + i)->center.red << "," << (clusters + i)->center.green << "," << (clusters + i)->center.blue << endl << endl;
-	}
-	cout << "size_total is: " << size_total << endl;
-	if (num_pixels != size_total) {
-		printf("the size total is different. Should be 262144\n");
-	}*/
-	
-	//// Free the memory (use upper)
-	//free(dist_cluster);
-	//// Free the memory
-	//free(centers_temp);
 }
 
 void free_img(const RGB_Image* img) {
@@ -569,12 +488,6 @@ void free_img(const RGB_Image* img) {
 
 int main(int argc, char* argv[])
 {
-	// To run skeleton.cpp call: 
-	//skeleton.cpp F K I T R
-	//skeleton.cpp data_file num_clusters Max_run thresh_hold num_runs
-	//skeleton.cpp ecoli.txt 8 100 0.000001 3
-	//skeleton.cpp ecoli.txt 8 100 0.000001 3
-	
 	const char* filename;	//"sample_image.ppm" /* Filename Pointer*/ 
 	int k;		//5			/* Number of clusters
 	
@@ -582,11 +495,8 @@ int main(int argc, char* argv[])
 	//int k = 2;		//5			/* Number of clusters*/
 
 	RGB_Image* img;
-	//RGB_Image* out_img;
+	//RGB_Image* out_img; //not sure if we need it?
 	RGB_Cluster* cluster;
-
-	//initialized cluster
-	//cluster = gen_rand_centers(img, k);
 
 	if (argc == 3) {
 		/* Image filename */
@@ -608,56 +518,23 @@ int main(int argc, char* argv[])
 	srand(time(NULL));
 
 	/* Print Args*/
-	printf("%s %d\n", filename, k);
+	printf("%s %d\n\n", filename, k);
 
 	/* Read Image*/
 	img = read_PPM(filename);
 
-	//testing
-	/*cout << endl;
-	cout << "image is: " << img << endl;
-	cout << "img->width:  " << img->width << endl;
-	cout << "img->height: " << img->height << endl;
-	cout << "img->size: " << img->size << endl;*/
-
-
-	/*cout << *(&img->data[num_pixels+5].red) << endl;
-	cout << *(&img->data[num_pixels+5].green) << endl;
-	cout << *(&img->data[num_pixels+5].blue) << endl << endl;*/
-
-	//testing
-	/*for (int i = 0; i < 3; i++) {
-		cout << i << " pixel: " << *(&img->data[i].red) << "," << *(&img->data[i].green)
-			<< "," << *(&img->data[i].blue) << endl;
-	}
-
-	cout << "first pixel address is: " << &img->data[0].red << "," << &img->data[0].green << "," << &img->data[0].blue << "," << endl;
-	cout << "second pixel address is: " << &img->data[1].red << "," << &img->data[1].green << "," << &img->data[1].blue << "," << endl;*/
-
-
+	
 	/* Test Batch K-Means*/
 	/* Start Timer*/
 	auto start = std::chrono::high_resolution_clock::now();
 
-	/* Initialize centers */
-	//cluster = gen_rand_centers(img, k);
-
-	/*testing delete after done*/
-	cout << endl;
-
-	//for (int i = 0; i < 3; i++) {
-	//	printf("Cluster %d's size is %d \n", i, *(&cluster->size));
-	//	//printf("Cluster %d's center is %d %d %d \n", i, (cluster+i)->center.red, (cluster + i)->center.green, (cluster + i)->center.blue);
-	//	cout << "Cluster " << i << "'s center is: " << (cluster+i)->center.red << "," << (cluster+i)->center.green << "," << (cluster+i)->center.blue << endl << endl;
-	//}
-
 	/* Implement Batch K-means*/
-
+	cout << endl;
+	/* Initialize centers */
 	cluster = gen_rand_centers(img, k);
 	batch_kmeans(img, k, MAX_ITERS, cluster);
 	cout << "\n------------------Finished running--------------------" << endl << endl;
-
-	
+		
 	//string output_img_name = "outputting_img_" + to_string(k) + ".ppm"; //testing
 
 	//Make new image with only k colors
