@@ -332,151 +332,215 @@ RGB_Cluster* gen_rand_centers(const RGB_Image* img, const int k) {
  /* Color quantization using the batch k-means algorithm */
 void batch_kmeans(const RGB_Image* img, const int k,
 	const int max_iters, RGB_Cluster* clusters)
-{
+{	
 	//step 1: initializing random centroids (aldready done in main)
 	//Declare variables
 	int counter_test = 0;
+	RGB_Cluster* clusters_past = (RGB_Cluster*)malloc(k * sizeof(RGB_Cluster));
+
 	double current_T = 1000;  //initilized a number greater than T
 	double SSE_past = 0; 
 	double SSE = 0; //first one is the past, second one is current
-	int size_img = *(&img->size); 
-	//cout << "size of image is: " << size_img; //testing
+	int size_img = *(&img->size);
 
-	/*step2: loop and Stop when relative improvement in SSE(Sum of Squared Error) between \
-	two consecutive iterations drops below T, threshold or reached maximum iteration*/
-	while (counter_test < max_iters) 
+	/*step2: loop and stop until none of the centroids changes */
+	while (true) 
 	{
-		//RGB_Pixel centers_temp[3] = {0}; 
-		RGB_Pixel* centers_temp = (RGB_Pixel*)malloc(k * sizeof(RGB_Pixel)); /*temporary centers of clusters in current iteration*/
+		//RGB_Pixel centers_temp_total[3] = {0}; 
+		RGB_Pixel* centers_temp_total = (RGB_Pixel*)malloc(k * sizeof(RGB_Pixel)); /*temporary centers of clusters in current iteration*/
 		/*double dist_cluster[k] = {0};*/
 		double* dist_cluster = (double*)malloc(k * sizeof(double));
-
-		//cout << "Iteration " << counter_test+1 << ": ";
-		/*printf("Iteration %d: ", counter_test+1);*/
+		
 		//reset SSE
 		SSE = 0;
 		
-		//step 3: Assign each pixel to cluster
-		//reset the size of each cluster and centers_temp	
+		//step3: Assign each pixel to cluster
+		
+		//reset the size of each cluster and centers_temp_total	
 		for (int i = 0; i < k; i++) {
 			clusters[i].size = 0;
 		}
-		//reset centers_temp
+		//reset centers_temp_total
 		for (int i = 0; i < k; i++) {
-			centers_temp[i].red = 0;
-			centers_temp[i].green = 0;
-			centers_temp[i].blue = 0;
+			RGB_Pixel* center_temp_total = &centers_temp_total[i];
+			center_temp_total->red = 0;
+			center_temp_total->green = 0;
+			center_temp_total->blue = 0;
 		}
 
-		//loop to go over all pixels
+		//loop over all pixels
 		for (int i = 0; i < size_img; i++) {	//size_img
 			//3.1 calculate distance of each pixel to each centroid using Squared Euclidean distance
-			double r = *(&img->data[i].red);
-			double g = *(&img->data[i].green);
-			double b = *(&img->data[i].blue);
+			RGB_Pixel* pixel = &img->data[i]; // cache the pixel to limit the CPU keep accessing the memory 6 times
 
-			//cout << "\nrgb is: " << r << "," << g << "," << b << endl; //testing
-
+			//cout << "\nrgb is: " << pixel->red << "," << pixel->green << "," << pixel->blue << endl; //testing
+			double min_dist = 1000000; //initiazize a big number
+			int min_index = -1; //initiazize a big number
 			for (int j = 0; j < k; j++) {
-				dist_cluster[j] = (r - (clusters + j)->center.red) * (r - (clusters + j)->center.red)
-					+ (g - (clusters + j)->center.green) * (g - (clusters + j)->center.green)
-					+ (b - (clusters + j)->center.blue) * (b - (clusters + j)->center.blue);
-				//cout << "distance is: " << dist_cluster[j] << endl; //testing
+				RGB_Cluster* cluster = &clusters[j];
+				double delta_red = pixel->red - cluster->center.red;
+				double delta_green = pixel->green - cluster->center.green;
+				double delta_blue = pixel->blue - cluster->center.blue;
+				double dist = delta_red * delta_red + delta_green * delta_green + delta_blue * delta_blue;
+				//cout << "distance is: " << dist << endl; //testing
+				if (dist < min_dist) {
+					min_dist = dist;
+					min_index = j;
+				}				
 			}
 			//3.2 assign each pixel to the nearest centroid
-			int ind = 0;
-			double min = dist_cluster[0];
-			for (int i = 0; i < k; i++) {
-				if (dist_cluster[i] < min) {
-					min = dist_cluster[i];
-					ind = i;
-				}
-			}
-			//int ind = std::distance(dist_cluster, max_element(dist_cluster, dist_cluster + sizeof(dist_cluster) / sizeof(dist_cluster[0]))); //testing for other way (not working)
-			//cout << "Nearest centroid is: " << ind << endl; //testing
-			centers_temp[ind].red += r;
-			centers_temp[ind].green += g;
-			centers_temp[ind].blue += b;
-			clusters[ind].size += 1;
+			//cout << "Nearest centroid is: " << min_index << endl; //testing
+			centers_temp_total[min_index].red += pixel->red;
+			centers_temp_total[min_index].green += pixel->green;
+			centers_temp_total[min_index].blue += pixel->blue;
+			clusters[min_index].size += 1;
 			//calculate SSE
-			SSE += min;			
+			SSE += min_dist;
 		}
 
-		//step 4: Recompute the cetroid of each cluster
+		//step4: Recompute the cetroid of each cluster
 		for (int i = 0; i < k; i++) {
-			(clusters + i)->center.red = centers_temp[i].red / clusters[i].size;
-			(clusters + i)->center.green = centers_temp[i].green / clusters[i].size;
-			(clusters + i)->center.blue = centers_temp[i].blue / clusters[i].size;
+			RGB_Cluster* cluster = &clusters[i];
+			RGB_Pixel* center_temp_total = &centers_temp_total[i];
+			if (cluster->size != 0) { // allow the center to remain the same if the cluster size is zero
+				cluster->center.red = center_temp_total->red / cluster->size;
+				cluster->center.green = center_temp_total->green / cluster->size;
+				cluster->center.blue = center_temp_total->blue / cluster->size;
+			}		
 		}
 
-
-		//calculate SSE		
+		//Initialize SSE_past and clusters_past for first time running
 		if (SSE_past == 0) { //first time running
 			SSE_past = SSE;
-			//cout << "SSE = " << SSE << endl;
 			printf("Iteration %d: SSE = %0.4f\n", counter_test + 1, SSE);
 			counter_test++;
-			//printf("SSE = %0.4f\n", SSE);
-			//cout << "Current threshhold is ignored (first iteration) " << endl; //testing
+			//initilize clusters_past to current clusters
+			for (int i = 0; i < k; i++) { //distance between the pixel with each centroid
+				RGB_Cluster* cluster = &clusters[i];
+				RGB_Cluster* cluster_past = &clusters_past[i];
+				if (cluster->size != 0) { // allow the center to remain the same if the cluster size is zero
+					cluster_past->center.red = cluster->center.red;
+					cluster_past->center.green = cluster->center.green;
+					cluster_past->center.blue = cluster->center.blue;
+				}
+			}
 			continue;
 		}
 
 		current_T = (SSE_past - SSE) / SSE_past;
-		SSE_past = SSE;
 		//printf("SSE = %0.4f\n", SSE);
 		printf("Iteration %d: SSE = %0.4f\n", counter_test+1, SSE);
-		//cout << "relative improvement in SSE = " << current_T << endl;
-		
-		//step 5: If relative improvement in SSE is less than threshhold T or this is the last iteration, save the image, and stop the loop
-		if (current_T < T || counter_test == max_iters - 1)
-		{
-			//save the image with k colors 
-			//loop to go over all pixels
-			for (int i = 0; i < size_img; i++) {	//size_img
-				//3.1 calculate distance of each pixel to each centroid using Squared Euclidean distance
-				double r = *(&img->data[i].red);
-				double g = *(&img->data[i].green);
-				double b = *(&img->data[i].blue);
-
-				//cout << "\nrgb is: " << r << "," << g << "," << b << endl; //testing
-
-				for (int j = 0; j < k; j++) {
-					dist_cluster[j] = (r - (clusters + j)->center.red) * (r - (clusters + j)->center.red)
-						+ (g - (clusters + j)->center.green) * (g - (clusters + j)->center.green)
-						+ (b - (clusters + j)->center.blue) * (b - (clusters + j)->center.blue);
-					//cout << "distance is: " << dist_cluster[j] << endl; //testing
-				}
-				//3.2 assign each pixel to the nearest centroid
-				int ind = 0;
-				double min = dist_cluster[0];
-				for (int i = 0; i < k; i++) {
-					if (dist_cluster[i] < min) {
-						min = dist_cluster[i];
-						ind = i;
-					}
-				}
-
-				//save the image with k colors
-				*(&img->data[i].red) = (clusters + ind)->center.red;
-				*(&img->data[i].green) = (clusters + ind)->center.green;
-				*(&img->data[i].blue) = (clusters + ind)->center.blue;
+		//cout << "relative improvement in SSE = " << current_T << endl; //testing
+			
+		//Step 5: If centroids do not change, save the image, and stop the loop
+		bool isSame = true;
+		for (int i = 0; i < k; i++) { // If centroids changes or not
+			RGB_Cluster* cluster = &clusters[i];
+			RGB_Cluster* cluster_past = &clusters_past[i];
+			if (cluster_past->center.red != cluster->center.red ||
+				cluster_past->center.green != cluster->center.green ||
+				cluster_past->center.blue != cluster->center.blue)
+			{
+				isSame = false;
+				break;
 			}
-
-			//cout << "threshhold reached when " << current_T << " < T(" << T << ")"; //another way
-			printf("threshhold reached when %.9f < T(%0.6f)", current_T, T); //maybe for testing
-			// Free the memory 
-			free(dist_cluster);
-			free(centers_temp);
+		}	
+		if (isSame == true) {  //If centroids do not change, save the image, and stop the loop 
+			free(centers_temp_total);
 			break;
 		}
 
+		//update clusters_past to current clusters
+		for (int i = 0; i < k; i++) {
+			RGB_Cluster* cluster = &clusters[i];
+			RGB_Cluster* cluster_past = &clusters_past[i];
+			if (cluster->size != 0) { // allow the center to remain the same if the cluster size is zero
+				cluster_past->center.red = cluster->center.red;
+				cluster_past->center.green = cluster->center.green;
+				cluster_past->center.blue = cluster->center.blue;
+			}
+		}
+		//update SSE_past
+		SSE_past = SSE;
+		
 		// Free the memory 
-		free(dist_cluster);
-		free(centers_temp);
+		free(centers_temp_total);
 
 		counter_test++;
 	}
+	//testing MSE to compare with calcMSE function
+	//double MSE = SSE / size_img; //testing
+	//printf("\ntesting, Mean Squared Error (MSE) is: %f \n", MSE); //testing
 }
+
+/*Save new image by assigning each pixel to the centroid value*/
+void save_new_img(const RGB_Image* img, RGB_Cluster* clusters, int k) {
+	int size_img = img->size;
+	//save the image with k colors 
+			//loop to go over all pixels
+	for (int i = 0; i < size_img; i++) {	//size_img
+		RGB_Pixel* pixel = &img->data[i];
+
+		//cout << "\nrgb is: " << pixel->red << "," << pixel->green << "," << pixel->blue << endl; //testing
+		double min_dist = 1000000; //initiazize a big number
+		int min_index = -1; //initiazize a big number
+		for (int j = 0; j < k; j++) { //distance between the pixel with each centroid
+			RGB_Cluster* cluster = &clusters[j];
+			double delta_red = pixel->red - cluster->center.red;
+			double delta_green = pixel->green - cluster->center.green;
+			double delta_blue = pixel->blue - cluster->center.blue;
+			double dist = delta_red * delta_red + delta_green * delta_green + delta_blue * delta_blue;
+			//cout << "distance is: " << dist << endl; //testing
+			if (dist < min_dist) {
+				min_dist = dist;
+				min_index = j;
+			}
+		}
+
+		//save the pixel with the color of the centroid of its cluter
+		RGB_Cluster* nearest_cluster = &clusters[min_index];
+		pixel->red = nearest_cluster->center.red;
+		pixel->green = nearest_cluster->center.green;
+		pixel->blue = nearest_cluster->center.blue;
+	}
+}
+
+/*Calculate Mean Squared Error (MSE)*/
+double calcMSE(const RGB_Image* img, RGB_Cluster* clusters, int k) {
+	double MSE = 0;
+	double SSE = 0; 
+	int size_img = img->size;
+	//int size_img = *(&img->size); 
+	//RGB_Pixel* centers_temp_total = (RGB_Pixel*)malloc(k * sizeof(RGB_Pixel)); /*temporary centers of clusters in current iteration*/
+
+	//loop over all pixels
+	for (int i = 0; i < size_img; i++) {	//size_img
+		//3.1 calculate distance of each pixel to each centroid using Squared Euclidean distance
+		RGB_Pixel* pixel = &img->data[i];
+
+		//cout << "\nrgb is: " << pixel->red << "," << pixel->green << "," << pixel->blue << endl; //testing
+		double min_dist = 1000000; //initiazize a big number
+		int min_index = -1; //initiazize a big number
+		for (int j = 0; j < k; j++) { //distance between the pixel with each centroid
+			RGB_Cluster* cluster = &clusters[j];
+			double delta_red = pixel->red - cluster->center.red;
+			double delta_green = pixel->green - cluster->center.green;
+			double delta_blue = pixel->blue - cluster->center.blue;
+			double dist = delta_red * delta_red + delta_green * delta_green + delta_blue * delta_blue;
+			//cout << "distance is: " << dist << endl; //testing
+			if (dist < min_dist) {
+				min_dist = dist;
+				min_index = j;
+			}
+		}
+		//calculate SSE
+		SSE += min_dist;
+	}
+	//printf("SSE is: %f \n", SSE); //testing
+	MSE = SSE / size_img;
+	return MSE;
+}
+
 
 void free_img(const RGB_Image* img) {
 	/* Free Image Data*/
@@ -486,17 +550,24 @@ void free_img(const RGB_Image* img) {
 	delete(img);
 }
 
+
+
+
+
 int main(int argc, char* argv[])
 {
+		
 	const char* filename;	//"sample_image.ppm" /* Filename Pointer*/ 
-	int k;		//5			/* Number of clusters
+	int k;					// Number of clusters
 	
 	//const char* filename = "sample_image.ppm";	//"sample_image.ppm" /* Filename Pointer*/ 
 	//int k = 2;		//5			/* Number of clusters*/
 
 	RGB_Image* img;
-	//RGB_Image* out_img; //not sure if we need it?
-	RGB_Cluster* cluster;
+	//RGB_Image* out_img;//not sure if we need it?
+	RGB_Cluster* clusters;
+	RGB_Image img_copy; //testing
+	RGB_Image* img_copy_ptr; //testing
 
 	if (argc == 3) {
 		/* Image filename */
@@ -518,10 +589,14 @@ int main(int argc, char* argv[])
 	srand(time(NULL));
 
 	/* Print Args*/
-	printf("%s %d\n\n", filename, k);
+	printf("%s %d\n", filename, k);
 
 	/* Read Image*/
 	img = read_PPM(filename);
+
+	img_copy = *img;
+	img_copy_ptr = &img_copy;
+
 
 	
 	/* Test Batch K-Means*/
@@ -531,27 +606,35 @@ int main(int argc, char* argv[])
 	/* Implement Batch K-means*/
 	cout << endl;
 	/* Initialize centers */
-	cluster = gen_rand_centers(img, k);
-	batch_kmeans(img, k, MAX_ITERS, cluster);
-	cout << "\n------------------Finished running--------------------" << endl << endl;
-		
+	clusters = gen_rand_centers(img, k);
+	batch_kmeans(img, k, MAX_ITERS, clusters);
+
 	//string output_img_name = "outputting_img_" + to_string(k) + ".ppm"; //testing
 
-	//Make new image with only k colors
+	//calculate Mean Squared Error (MSE)
+	double MSE = calcMSE(img, clusters, k);
+	printf("Mean Squared Error (MSE) is: %f \n", MSE);
+
+	//save new image with new clusters found
+	save_new_img(img, clusters, k);
+
+	//Make new image by writing to ppm file
 	write_PPM(img, "outputting_img.ppm");
 
+	cout << "\n------------------Finished running--------------------" << endl << endl;
 	/* Stop Timer*/
 	auto stop = std::chrono::high_resolution_clock::now();
 	//auto stop = high_resolution_clock::now();
 
 	/* Execution Time*/
-	auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
+	//auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
 
 	std::chrono::duration<double> diff = stop - start;
 
 	std::cout << "Time to run is: " << diff.count() << " s\n";
-
-	free(cluster);
+	
+	free(clusters);
+	free_img(img);
 
 	return 0;
 }
