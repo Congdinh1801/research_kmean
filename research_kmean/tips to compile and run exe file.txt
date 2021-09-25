@@ -2,4 +2,4 @@ to compile test.exe:
 g++ skeleton.cpp -o test.exe
 
 to run test.exe: 
-test.exe "sample_image.ppm" 3
+test.exe "sample_image.ppm" 2

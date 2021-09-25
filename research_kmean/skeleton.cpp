@@ -1,25 +1,9 @@
 #include <chrono>
-#include <climits>
 #include <iostream>
-#include <sstream>
-#include <algorithm>
-#include <fstream>
-#include <math.h>
-#include <string.h>
-#include <cstdlib>
-#include <time.h>
-#include <float.h>
-#include <iomanip>
-#include <vector>
-
-
-#include <stdio.h>
-#include <stdlib.h>
 
 #pragma warning(disable:4996)
 
 using namespace std;
-using namespace std::chrono;
 
 typedef unsigned char uchar;
 typedef unsigned long ulong;
@@ -51,17 +35,17 @@ typedef struct
 /* Mersenne Twister related constants */
 #define N 624
 #define M 397
-#define MAXBIT 30
+//#define MAXBIT 30
 #define MATRIX_A 0x9908b0dfUL   /* constant vector a */
 #define UPPER_MASK 0x80000000UL /* most significant w-r bits */
 #define LOWER_MASK 0x7fffffffUL /* least significant r bits */
 #define MAX_RGB_DIST 195075		/*max number of rgb in 1D 255*255*3 = 195075*/
-#define MAX_ITERS 100		/*default 100 I: maximum number of iterations in a run*/
+//#define MAX_ITERS 100		/*default 100 I: maximum number of iterations in a run*/
 //#define MAX_RUN 5	/*DEFAULT IS 100*/
-#define T 0.000001 /*(convergence threshold)*/
+//#define T 0.000001 /*(convergence threshold)*/
 
-//my defined number
-#define num_pixels 262144	
+//testing
+//#define num_pixels 262144	//testing 512*512=262144
 
 
 static ulong mt[N]; /* the array for the state vector  */
@@ -330,51 +314,48 @@ RGB_Cluster* gen_rand_centers(const RGB_Image* img, const int k) {
  */
 
  /* Color quantization using the batch k-means algorithm */
-void batch_kmeans(const RGB_Image* img, const int k,
-	const int max_iters, RGB_Cluster* clusters)
-{	
+void batch_kmeans(const RGB_Image* img, const int k, RGB_Cluster* clusters)
+{
 	//step 1: initializing random centroids (aldready done in main)
+
 	//Declare variables
-	int counter_test = 0;
-	RGB_Cluster* clusters_past = (RGB_Cluster*)malloc(k * sizeof(RGB_Cluster));
+	int iter_cnt = 0;
+	double SSE = 0; 
+	RGB_Pixel* centers_temp = (RGB_Pixel*)malloc(k * sizeof(RGB_Pixel)); /*temporary centers of clusters in current iteration*/
+	int num_pts_change = 0;
+	int* pixels_member = (int*)malloc(img->size * sizeof(int));
+	//initialize -1 as cluster membership for each pixel
+	for (int i = 0; i < img->size; i++) {
+		pixels_member[i] = -1;
+	}
 
-	double current_T = 1000;  //initilized a number greater than T
-	double SSE_past = 0; 
-	double SSE = 0; //first one is the past, second one is current
-	int size_img = *(&img->size);
-
-	/*step2: loop and stop until none of the centroids changes */
+	/*step2: loop and stop until all pixels stop changing their memberships */
 	while (true) 
 	{
-		//RGB_Pixel centers_temp_total[3] = {0}; 
-		RGB_Pixel* centers_temp_total = (RGB_Pixel*)malloc(k * sizeof(RGB_Pixel)); /*temporary centers of clusters in current iteration*/
-		/*double dist_cluster[k] = {0};*/
-		double* dist_cluster = (double*)malloc(k * sizeof(double));
-		
-		//reset SSE
+		//reset SSE and reset number of points change
+		num_pts_change = 0;
 		SSE = 0;
 		
-		//step3: Assign each pixel to cluster
-		
-		//reset the size of each cluster and centers_temp_total	
+		//reset the size of each cluster and centers_temp	
 		for (int i = 0; i < k; i++) {
 			clusters[i].size = 0;
 		}
-		//reset centers_temp_total
+		//reset centers_temp
 		for (int i = 0; i < k; i++) {
-			RGB_Pixel* center_temp_total = &centers_temp_total[i];
-			center_temp_total->red = 0;
-			center_temp_total->green = 0;
-			center_temp_total->blue = 0;
+			RGB_Pixel* center_temp = &centers_temp[i];
+			center_temp->red = 0;
+			center_temp->green = 0;
+			center_temp->blue = 0;
 		}
 
-		//loop over all pixels
-		for (int i = 0; i < size_img; i++) {	//size_img
+		/*step3: Assign each pixel to nearerst cluster*/
+		//Iterate over each pixel in the img
+		for (int i = 0; i < img->size; i++) {	//img->size
 			//3.1 calculate distance of each pixel to each centroid using Squared Euclidean distance
 			RGB_Pixel* pixel = &img->data[i]; // cache the pixel to limit the CPU keep accessing the memory 6 times
 
 			//cout << "\nrgb is: " << pixel->red << "," << pixel->green << "," << pixel->blue << endl; //testing
-			double min_dist = 1000000; //initiazize a big number
+			double min_dist = MAX_RGB_DIST; //initiazize a big number
 			int min_index = -1; //initiazize a big number
 			for (int j = 0; j < k; j++) {
 				RGB_Cluster* cluster = &clusters[j];
@@ -388,99 +369,52 @@ void batch_kmeans(const RGB_Image* img, const int k,
 					min_index = j;
 				}				
 			}
-			//3.2 assign each pixel to the nearest centroid
 			//cout << "Nearest centroid is: " << min_index << endl; //testing
-			centers_temp_total[min_index].red += pixel->red;
-			centers_temp_total[min_index].green += pixel->green;
-			centers_temp_total[min_index].blue += pixel->blue;
+			//3.2 assign each pixel to the nearest centroid
+			centers_temp[min_index].red += pixel->red;
+			centers_temp[min_index].green += pixel->green;
+			centers_temp[min_index].blue += pixel->blue;
 			clusters[min_index].size += 1;
+			//update pixels_member array and num_pts_change
+			if (pixels_member[i] != min_index) {
+				pixels_member[i] = min_index;
+				num_pts_change++;
+			}
+
 			//calculate SSE
 			SSE += min_dist;
 		}
 
+		//cout << "num_pts_change is: " << num_pts_change << endl; //testing
+
 		//step4: Recompute the cetroid of each cluster
 		for (int i = 0; i < k; i++) {
 			RGB_Cluster* cluster = &clusters[i];
-			RGB_Pixel* center_temp_total = &centers_temp_total[i];
+			RGB_Pixel* center_temp = &centers_temp[i];
 			if (cluster->size != 0) { // allow the center to remain the same if the cluster size is zero
-				cluster->center.red = center_temp_total->red / cluster->size;
-				cluster->center.green = center_temp_total->green / cluster->size;
-				cluster->center.blue = center_temp_total->blue / cluster->size;
+				cluster->center.red = center_temp->red / cluster->size;
+				cluster->center.green = center_temp->green / cluster->size;
+				cluster->center.blue = center_temp->blue / cluster->size;
 			}		
 		}
-
-		//Initialize SSE_past and clusters_past for first time running
-		if (SSE_past == 0) { //first time running
-			SSE_past = SSE;
-			printf("Iteration %d: SSE = %0.4f\n", counter_test + 1, SSE);
-			counter_test++;
-			//initilize clusters_past to current clusters
-			for (int i = 0; i < k; i++) { //distance between the pixel with each centroid
-				RGB_Cluster* cluster = &clusters[i];
-				RGB_Cluster* cluster_past = &clusters_past[i];
-				if (cluster->size != 0) { // allow the center to remain the same if the cluster size is zero
-					cluster_past->center.red = cluster->center.red;
-					cluster_past->center.green = cluster->center.green;
-					cluster_past->center.blue = cluster->center.blue;
-				}
-			}
-			continue;
-		}
-
-		current_T = (SSE_past - SSE) / SSE_past;
-		//printf("SSE = %0.4f\n", SSE);
-		printf("Iteration %d: SSE = %0.4f\n", counter_test+1, SSE);
-		//cout << "relative improvement in SSE = " << current_T << endl; //testing
-			
-		//Step 5: If centroids do not change, save the image, and stop the loop
-		bool isSame = true;
-		for (int i = 0; i < k; i++) { // If centroids changes or not
-			RGB_Cluster* cluster = &clusters[i];
-			RGB_Cluster* cluster_past = &clusters_past[i];
-			if (cluster_past->center.red != cluster->center.red ||
-				cluster_past->center.green != cluster->center.green ||
-				cluster_past->center.blue != cluster->center.blue)
-			{
-				isSame = false;
-				break;
-			}
-		}	
-		if (isSame == true) {  //If centroids do not change, save the image, and stop the loop 
-			free(centers_temp_total);
+		printf("Iteration %d: SSE = %0.4f\n", iter_cnt+1, SSE);
+		
+		//Step 5: If points stop changing their memberships, stop the loop
+		if (num_pts_change == 0) {
 			break;
 		}
-
-		//update clusters_past to current clusters
-		for (int i = 0; i < k; i++) {
-			RGB_Cluster* cluster = &clusters[i];
-			RGB_Cluster* cluster_past = &clusters_past[i];
-			if (cluster->size != 0) { // allow the center to remain the same if the cluster size is zero
-				cluster_past->center.red = cluster->center.red;
-				cluster_past->center.green = cluster->center.green;
-				cluster_past->center.blue = cluster->center.blue;
-			}
-		}
-		//update SSE_past
-		SSE_past = SSE;
-		
-		// Free the memory 
-		free(centers_temp_total);
-
-		counter_test++;
+		iter_cnt++;
 	}
-	//testing MSE to compare with calcMSE function
-	//double MSE = SSE / size_img; //testing
-	//printf("\ntesting, Mean Squared Error (MSE) is: %f \n", MSE); //testing
+
+	// Free the memory 
+	free(centers_temp);	
 }
 
-/*Save new image by assigning each pixel to the centroid value*/
+/*Save new image by assigning each pixel to the its belonging cluster's centroid*/
 void save_new_img(const RGB_Image* img, RGB_Cluster* clusters, int k) {
-	int size_img = img->size;
-	//save the image with k colors 
-			//loop to go over all pixels
-	for (int i = 0; i < size_img; i++) {	//size_img
+	//Iterate over each pixel in the img
+	for (int i = 0; i < img->size; i++) { //loop to go over all pixels //img->size
 		RGB_Pixel* pixel = &img->data[i];
-
 		//cout << "\nrgb is: " << pixel->red << "," << pixel->green << "," << pixel->blue << endl; //testing
 		double min_dist = 1000000; //initiazize a big number
 		int min_index = -1; //initiazize a big number
@@ -509,12 +443,8 @@ void save_new_img(const RGB_Image* img, RGB_Cluster* clusters, int k) {
 double calcMSE(const RGB_Image* img, RGB_Cluster* clusters, int k) {
 	double MSE = 0;
 	double SSE = 0; 
-	int size_img = img->size;
-	//int size_img = *(&img->size); 
-	//RGB_Pixel* centers_temp_total = (RGB_Pixel*)malloc(k * sizeof(RGB_Pixel)); /*temporary centers of clusters in current iteration*/
-
-	//loop over all pixels
-	for (int i = 0; i < size_img; i++) {	//size_img
+	//Iterate over each pixel in the img
+	for (int i = 0; i < img->size; i++) {	//img->size
 		//3.1 calculate distance of each pixel to each centroid using Squared Euclidean distance
 		RGB_Pixel* pixel = &img->data[i];
 
@@ -537,7 +467,7 @@ double calcMSE(const RGB_Image* img, RGB_Cluster* clusters, int k) {
 		SSE += min_dist;
 	}
 	//printf("SSE is: %f \n", SSE); //testing
-	MSE = SSE / size_img;
+	MSE = SSE / img->size;
 	return MSE;
 }
 
@@ -551,17 +481,14 @@ void free_img(const RGB_Image* img) {
 }
 
 
-
-
-
 int main(int argc, char* argv[])
 {
 		
 	const char* filename;	//"sample_image.ppm" /* Filename Pointer*/ 
-	int k;					// Number of clusters
+	int k;					/* Number of clusters
 	
 	//const char* filename = "sample_image.ppm";	//"sample_image.ppm" /* Filename Pointer*/ 
-	//int k = 2;		//5			/* Number of clusters*/
+	//int k = 3;		//5			/* Number of clusters*/
 
 	RGB_Image* img;
 	//RGB_Image* out_img;//not sure if we need it?
@@ -597,8 +524,6 @@ int main(int argc, char* argv[])
 	img_copy = *img;
 	img_copy_ptr = &img_copy;
 
-
-	
 	/* Test Batch K-Means*/
 	/* Start Timer*/
 	auto start = std::chrono::high_resolution_clock::now();
@@ -607,7 +532,7 @@ int main(int argc, char* argv[])
 	cout << endl;
 	/* Initialize centers */
 	clusters = gen_rand_centers(img, k);
-	batch_kmeans(img, k, MAX_ITERS, clusters);
+	batch_kmeans(img, k, clusters);
 
 	//string output_img_name = "outputting_img_" + to_string(k) + ".ppm"; //testing
 
