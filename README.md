@@ -44,6 +44,6 @@ c. Applied Batch Neural Gas with k = 3
 
 d. Run time
 <p>
-k = 2 <img width="256" height="312" src="./img/runtime_bng_2.JPG">
-k = 3 <img width="256" height="312" src="./img/runtime_bng_3.JPG">
+k = 2 <img width="400" height="600" src="./img/runtime_bng_2.JPG">
+k = 3 <img width="400" height="600" src="./img/runtime_bng_3.JPG">
 </p>
