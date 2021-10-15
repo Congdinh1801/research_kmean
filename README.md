@@ -25,7 +25,7 @@ k = 2 <img width="256" height="312" src="./img/runtime_kmean_2.JPG">
 k = 3 <img width="256" height="312" src="./img/runtime_kmean_3.JPG">
 </p>
 
-# I. Batch Neural Gas
+# II. Batch Neural Gas
 ## Sample results 
 a. Original picture
 <p>
