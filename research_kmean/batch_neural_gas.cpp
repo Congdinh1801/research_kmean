@@ -1,6 +1,8 @@
 ﻿#include <map>
 #include <math.h>       /* pow */
 
+#include <vector>
+#include <algorithm>    // std::sort, std::stable_sort
 
 #include <chrono>
 #include <iostream>
@@ -44,13 +46,10 @@ typedef struct
 #define UPPER_MASK 0x80000000UL /* most significant w-r bits */
 #define LOWER_MASK 0x7fffffffUL /* least significant r bits */
 #define TOTAL_PIXELS 262144		/*max number of rgb in 1D 512*512 = 262144*/
-//#define MAX_ITERS 100		/*default 100 I: maximum number of iterations in a run*/
-//#define MAX_RUN 5	/*DEFAULT IS 100*/
-//#define T 0.000001 /*(convergence threshold)*/
 
-#define DECAY_FINAL 0.01	/*decay constant final*/
+#define LAMBDA_FINAL 0.01	/*decay constant final*/
 #define MAX_ITERS 100		// maximum number of iteration, default 100
-#define CONV_THRESH 0.001	//convergence threshold, default ε = 0.001
+#define CONV_THRESH 0.01	//convergence threshold, default ε = 0.001
 
 //testing
 //#define num_pixels 262144	//testing 512*512=262144
@@ -325,11 +324,6 @@ double calcMSE(const RGB_Image* img, RGB_Cluster* clusters, int k);
 /* Color quantization using the batch k-means algorithm */
 void batch_kmeans(const RGB_Image* img, const int k, RGB_Cluster* clusters)
 {
-	//batch_kmeans(img, k, INT_MAX, cluster);
-	//printf("Cluster %d's size is %d \n", i, *(&cluster->size));
-	////printf("Cluster %d's center is %d %d %d \n", i, (cluster+i)->center.red, (cluster + i)->center.green, (cluster + i)->center.blue);
-	//cout << "Cluster " << i << "'s center is: " << (cluster + i)->center.red << "," << (cluster + i)->center.green << "," << (cluster + i)->center.blue << endl << endl;
-
 	//step 1: initializing random centroids (aldready done in main)
 
 	//Declare variables
@@ -342,20 +336,6 @@ void batch_kmeans(const RGB_Image* img, const int k, RGB_Cluster* clusters)
 	for (int i = 0; i < img->size; i++) {
 		pixels_member[i] = -1;
 	}
-
-	////testing
-	//cout << "pixels_member before: " << endl;
-	//cout << pixels_member[0] << endl;
-	//cout << pixels_member[1] << endl;
-	//cout << pixels_member[2] << endl;
-
-	//testing for initial clusters' centers
-	//cout << "Initial clusters' centers are: " << endl;
-	//for (int i = 0; i < k; i++) {
-	//	printf("Cluster %d's size is %d \n", i, *(&clusters->size));
-	//	//printf("Cluster %d's center is %d %d %d \n", i, (cluster+i)->center.red, (cluster + i)->center.green, (cluster + i)->center.blue);
-	//	cout << "Cluster " << i << "'s center is: " << (clusters + i)->center.red << "," << (clusters + i)->center.green << "," << (clusters + i)->center.blue << endl << endl;
-	//}
 
 	/*step2: loop and stop until all pixels stop changing their memberships */
 	while (true)
@@ -413,12 +393,6 @@ void batch_kmeans(const RGB_Image* img, const int k, RGB_Cluster* clusters)
 			SSE += min_dist;
 		}
 
-		////testing
-		//cout << "pixels_member after: " << endl;
-		//cout << pixels_member[0] << endl;
-		//cout << pixels_member[1] << endl;
-		//cout << pixels_member[2] << endl;
-
 		//cout << "num_pts_change is: " << num_pts_change << endl; //testing
 
 		//step4: Recompute the cetroid of each cluster
@@ -431,8 +405,7 @@ void batch_kmeans(const RGB_Image* img, const int k, RGB_Cluster* clusters)
 				cluster->center.blue = center_temp->blue / cluster->size;
 			}
 		}
-		printf("Iteration %d: MSE = %0.4f\n", iter_cnt + 1, calcMSE(img, clusters, k));
-		//printf("Iteration %d: SSE = %0.4f\n", iter_cnt + 1, SSE);
+		printf("Iteration %d: SSE = %0.4f\n", iter_cnt + 1, SSE);
 
 		//Step 5: If points stop changing their memberships, stop the loop
 		if (num_pts_change == 0) {
@@ -441,88 +414,55 @@ void batch_kmeans(const RGB_Image* img, const int k, RGB_Cluster* clusters)
 		iter_cnt++;
 	}
 
-	//testing 
-	//double MSE = SSE / img->size; //testing
-	//printf("\ntesting, Mean Squared Error (MSE) is: %f \n", MSE); //testing
-
-	/*unsigned int size_total = 0;
-	cout << "\n\nResulted clusters are: " << endl;
-	for (int i = 0; i < k; i++) {
-		if ((clusters + i)->size == 0) {
-			printf("cluster %d has size 0, skip\n\n", i);
-			continue;
-		}
-		printf("Cluster %d's size is %d \n", i, clusters[i].size);
-		size_total += clusters[i].size;
-		cout << "Cluster " << i << "'s center is: " << (clusters + i)->center.red << "," << (clusters + i)->center.green << "," << (clusters + i)->center.blue << endl << endl;
-	}
-	cout << "size_total is: " << size_total << endl;
-	if (num_pixels != size_total) {
-		printf("the size total is different. Should be 262144\n");
-	}*/
-
 	// Free the memory 
 	free(centers_temp);
 }
-
-/*cost function for batch neural gas*/
-double cost_functionBNG(const RGB_Image* img, RGB_Cluster* clusters, int k, int iter_cnt);
 
 /* Color quantization using the batch neural gas algorithm */
 void batch_neural_gas(const RGB_Image* img, const int k, RGB_Cluster* clusters) {
 	//step 1: initializing random centroids (aldready done in main)
 
 	//Declare variables
+	vector<double> dist_array; //distances between pixel and prototype
+	double* weights = (double*)malloc(k * sizeof(double)); /*temporary weights*/
+	RGB_Pixel* centers_temp = (RGB_Pixel*)malloc(k * sizeof(RGB_Pixel)); /*temporary centers of clusters in current iteration*/
 
-	int image_size = img->size;
+	double lambda_initial = k / 2.0;
+	double lambda;
 
-	double* dist_array = (double*)malloc(k * sizeof(double)); //array to store distances of a pixel to each centroid
-	double* dist_array_copy = (double*)malloc(k * sizeof(double));
-	
-	int** rank_array = (int**)malloc(image_size * sizeof(int*));
-	for (int i = 0; i < image_size; i++) {
-		rank_array[i] = (int*)malloc(k * sizeof(int));
-	}
-	double decay_init = k / 2;
-	double decay;
-
-	double relative_cost = 1; //initialized to be greater than CONV_THRESH
-	double current_cost = -1;
+	double current_cost = 0;
+	double relative_cost = 1; //initialized with anything greater than CONV_THRESH(0.01)
 	double previous_cost = 0;
 
 	int iter_cnt = 0; //iteration counter
 	double SSE = 0; //sum squared error
-	
-	////testing for initial clusters' centers
-	//cout << "Initial clusters' centers are: " << endl;
-	//for (int i = 0; i < k; i++) {
-	//	//printf("Cluster %d's size is %d \n", i, *(&clusters->size));
-	//	//printf("Cluster %d's center is %d %d %d \n", i, (cluster+i)->center.red, (cluster + i)->center.green, (cluster + i)->center.blue);
-	//	cout << "Cluster " << i << "'s center is: " << (clusters + i)->center.red << "," << (clusters + i)->center.green << "," << (clusters + i)->center.blue << endl;
-	//}
 
 	/*step2: loop and stop until convergence threashold is reached or max iteration is reached*/
 	while (iter_cnt < MAX_ITERS && relative_cost > CONV_THRESH) //MAX_ITERS 
 	{
+		//reset centers_temp and weights
+		for (int i = 0; i < k; i++) {
+			RGB_Pixel* center_temp = &centers_temp[i];
+			center_temp->red = 0;
+			center_temp->green = 0;
+			center_temp->blue = 0;
+			weights[i] = 0;
+		}
+
+		//reset current_cost
+		current_cost = 0;
+
 		/*step3: Compute Euclidean distance and sorted the distance for all prototype*/
+		//First, calculate the decay constant for this iteration
+		lambda = lambda_initial * pow((LAMBDA_FINAL / lambda_initial), (iter_cnt * 1.0 / MAX_ITERS)); //20.0  //MAX_ITERS
+		cout << "decay constant is: " << lambda << endl; //testing
 
 		//Iterate over each pixel in the img		//img->size //testing with 10 pixels
 		for (int i = 0; i < img->size; i++) {
-			
-			RGB_Pixel* pixel = &img->data[i]; // cache the pixel to limit the CPU keep accessing the memory
-			//cout << "\nrgb is: " << pixel->red << "," << pixel->green << "," << pixel->blue << endl; //testing
-			
-			//reset distances in dist_array
-			for (int i = 0; i < k; i++) {
-				dist_array[i] = 0;
-			}
 
-			////testing distance_arr at initilization time
-			//cout << "distance array at initilization time is: "; 
-			//for (int j = 0; j < k; j++) {
-			//	cout << dist_array[j] << " ";
-			//}
-			//cout << endl;
+			RGB_Pixel* pixel = &img->data[i]; // cache the pixel to limit the CPU keep accessing the memory
+			//reset dist_array
+			dist_array.clear();
 
 			//3.1 calculate distance of this pixel to each centroid using Squared Euclidean distance  \
 			and add it to dist_array
@@ -532,318 +472,68 @@ void batch_neural_gas(const RGB_Image* img, const int k, RGB_Cluster* clusters) 
 				double delta_green = pixel->green - cluster->center.green;
 				double delta_blue = pixel->blue - cluster->center.blue;
 				double dist = delta_red * delta_red + delta_green * delta_green + delta_blue * delta_blue;
-				dist_array[j] = dist;
-				////cout << "distance is: " << dist << endl; //testing
+				dist_array.push_back(dist);
 			}
 
-			//cout << "distance array before sorting is: "; //testing
-			//for (int j = 0; j < k; j++) {
-			//	cout << dist_array[j] << " ";
-			//}
-			//cout << endl;
-
-			//3.2 Sort the distances array
-			//3.2.1 Make a copy of dist_array
-			for (int i = 0; i < k; i++) {
-				dist_array_copy[i] = dist_array[i];
+			//3.2 Sort the distances and get the rank of prototypes
+			vector<int> index_rank(dist_array.size(), 0);
+			for (int i = 0; i != index_rank.size(); i++) {
+				index_rank[i] = i;
 			}
-			//3.2.2 Sort the dist_array
-			double temp;
-			for (int i = 0; i < k; i++)
-			{
-				for (int j = i + 1; j < k; j++)
-				{
-					//If there is a smaller element found on right of the array then swap it.
-					if (dist_array[j] < dist_array[i])
-					{
-						temp = dist_array[i];
-						dist_array[i] = dist_array[j];
-						dist_array[j] = temp;
-					}
+			sort(index_rank.begin(), index_rank.end(),
+				[&](const int& a, const int& b) {
+					return (dist_array[a] < dist_array[b]);
 				}
+			);
+
+			//3.4: calculate the cost function and updating for prototypes
+			for (int j = 0; j < k; j++) { //for each cluster
+				//3.3.1 compute the updating for prototypes according to rank to each centroid for this pixel
+				double h_func = exp(-index_rank[j] / lambda);
+				centers_temp[j].red += h_func * pixel->red;
+				centers_temp[j].green += h_func * pixel->green;
+				centers_temp[j].blue += h_func * pixel->blue;
+				weights[j] += h_func;
+				//3.3.2: calculate the cost function
+				RGB_Cluster* cluster = &clusters[j]; // cache the cluster to limit the CPU keep accessing the memory
+				double delta_red = pixel->red - cluster->center.red;
+				double delta_green = pixel->green - cluster->center.green;
+				double delta_blue = pixel->blue - cluster->center.blue;
+				double euclidean_norm = sqrt(delta_red * delta_red + delta_green * delta_green + delta_blue * delta_blue);
+				current_cost += h_func * euclidean_norm; //testing //1.5258789062500000e-05 //probability(img, *pixel)
 			}
-
-			//cout << "distance array after sorting is: "; //testing
-			//for (int i = 0; i < k; i++) {
-			//	cout << dist_array[i] << " ";
-			//}
-			//cout << endl;
-
-			std::map<int, int> dict_rank = {}; //store rank of the prototypes sorted \
-											   for this pixel according to the distances
-
-			//cout << "Inital dict_rank is: \n"; //testing
-			for (int i = 0; i < k; i++)
-			{
-				dict_rank.insert({ i, i });
-				//cout << i << ": " << dict_rank[i] << "\n"; //testing
-			}
-			//cout << endl; //testing
-
-			//3.3 update rank of the prototypes sorted \
-			for this pixel according to the sorted distance array
-			for (int i = 0; i < k; i++)
-			{
-				for (int j = 0; j < k; j++) {
-					if (dist_array_copy[i] == dist_array[j]) { //find the rank of prototype i in the sorted array dist_array
-						dict_rank[i] = j; //place this rank j for prototype i in the dict_rank
-					}
-				}
-			}
-
-			//cout << "after dict_rank is: \n"; //testing
-			//for (int i = 0; i < k; i++)
-			//{
-			//	cout << i << ": " << dict_rank[i] << "\n";
-			//}
-
-			for (int c = 0; c < k; c++)
-			{
-				//rank_array[i] = i + 1;
-				rank_array[i][c] = dict_rank[c]; //2d array of rank. For each pixel i, \
-												 update rank of prototypes based on the dict_rank
-			}
-
-			//cout << "rank array is: \n"; //testing
-			//for (int c = 0; c < k; c++)
-			//{
-			//	cout << rank_array[i][c] << ", ";
-			//}
-			//cout << endl;
 		}	//end of the loop to iterate over all pixels
 
-		//step4: update each  prototype vector (update cluster center)
-		
-		//4.1 calculate the decay constant for this iteration
-		decay = decay_init * pow((DECAY_FINAL / decay_init), (iter_cnt / 20.0));
-		//cout << "decay constant is: " << decay << endl; //testing
-
-		//4.2 update prototype vectors (clusters' centers)
-		for (int c = 0; c < k; c++) { //for each cluster  
-			RGB_Cluster* cluster = &clusters[c];
-			//Numerator and Denominator
-			double update_red = 0;
-			double update_green = 0;
-			double update_blue = 0;
-			double update_denominator = 0;
-			for (int p = 0; p < image_size; p++) {  // for each pixel //img->size , test with 2
-				RGB_Pixel* pixel = &img->data[p]; // cache the pixel to limit the CPU keep accessing the memory 
-				//double dummy2 = (exp(-0 / 2.5) * 164 + exp(-1 / 2.5) * 63) / (exp(-0 / 2.5) + exp(-1 / 2.5));
-				update_red += exp(-rank_array[p][c] / decay) * pixel->red;
-				update_green += exp(-rank_array[p][c] / decay) * pixel->green;
-				update_blue += exp(-rank_array[p][c] / decay) * pixel->blue;
-				update_denominator += exp(-rank_array[p][c] / decay);
-			}
-			cluster->center.red = update_red / update_denominator;
-			cluster->center.green = update_green / update_denominator;
-			cluster->center.blue = update_blue / update_denominator;
+		//step4: Recompute the cetroid of each cluster
+		for (int j = 0; j < k; j++) {
+			RGB_Cluster* cluster = &clusters[j];
+			RGB_Pixel* center_temp = &centers_temp[j];
+			//printf("update_red green blue are: %f , %f, %f", center_temp->green, center_temp->red, center_temp->blue); //testing
+			cluster->center.red = center_temp->red / weights[j];
+			cluster->center.green = center_temp->green / weights[j];
+			cluster->center.blue = center_temp->blue / weights[j];
 		}
 
-		////testing after update clusters' centers for this iteration
-		//cout << "\Final clusters' centers are: " << endl;
-		//for (int i = 0; i < k; i++) {
-		//	//printf("Cluster %d's size is %d \n", i, *(&clusters->size));
-		//	//printf("Cluster %d's center is %d %d %d \n", i, (cluster+i)->center.red, (cluster + i)->center.green, (cluster + i)->center.blue);
-		//	cout << "Cluster " << i << "'s center is: " << (clusters + i)->center.red << "," << (clusters + i)->center.green << "," << (clusters + i)->center.blue << endl;
-		//}
-
-		//Calculate the cost using the cost function cost_functionBNG
-		current_cost = cost_functionBNG(img, clusters, k, iter_cnt);
+		//Calculate relative cost
 		if (iter_cnt == 0) {
-			relative_cost = 1; // anything > CONV_THRESH
+			relative_cost = 1; // anything > CONV_THRESH (0.01)
 		}
 		else {
 			relative_cost = (previous_cost - current_cost) / current_cost;
 		}
-		
-		
+
 		printf("Iteration %d: cost = %.9f\n", iter_cnt + 1, current_cost);
 		printf("Iteration %d: relative_cost = %.9f\n", iter_cnt + 1, relative_cost);
 
 		//testing SSE
 		printf("Iteration %d: MSE = %0.4f\n", iter_cnt + 1, calcMSE(img, clusters, k));
 		printf("----------------End of Iteration %d--------------\n\n", iter_cnt + 1);
-		
+
 		//Update previous_cost and iteration counter
 		previous_cost = current_cost; //update previous cost
-		iter_cnt++;
+		iter_cnt++; //update counter
 	}
-
-	//testing clusters' centers after the algorithm
-	cout << "Final clusters' centers are: " << endl;
-	for (int i = 0; i < k; i++) {
-		//printf("Cluster %d's size is %d \n", i, *(&clusters->size));
-		//printf("Cluster %d's center is %d %d %d \n", i, (cluster+i)->center.red, (cluster + i)->center.green, (cluster + i)->center.blue);
-		cout << "Cluster " << i << "'s center is: " << (clusters + i)->center.red << "," << (clusters + i)->center.green << "," << (clusters + i)->center.blue << endl;
-	}
-
-	//clean the memory
-	free(dist_array);
 }
-
-//double probability(const RGB_Image* img, RGB_Pixel pixel); //not used
-
-/*cost function for batch neural gas*/
-double cost_functionBNG(const RGB_Image* img, RGB_Cluster* clusters, int k, int iter_cnt) {
-	
-	//Declare variables
-	double cost = 0;
-	int image_size = img->size; // img->size //test with only 10 pixels
-
-	double* dist_array = (double*)malloc(k * sizeof(double));
-	double* dist_array_copy = (double*)malloc(k * sizeof(double));
-	
-	int** rank_array = (int**)malloc(image_size * sizeof(int*));
-	for (int i = 0; i < image_size; i++) {
-		rank_array[i] = (int*)malloc(k * sizeof(int));
-	}
-	double decay_init = k / 2;
-	double decay;
-
-	//Iterate over each pixel in the img		//img->size //test with only 10 pixels
-	for (int i = 0; i < image_size; i++) {
-		//Step1: calculate distance of each pixel to each centroid using Squared Euclidean distance    
-		RGB_Pixel* pixel = &img->data[i]; // cache the pixel to limit the CPU keep accessing the memory 6 times
-
-		//cout << "\nrgb is: " << pixel->red << "," << pixel->green << "," << pixel->blue << endl; //testing
-		//reset distances in dist_array
-		for (int i = 0; i < k; i++) {
-			dist_array[i] = 0;
-		}
-
-		for (int j = 0; j < k; j++) {
-			RGB_Cluster* cluster = &clusters[j];
-			double delta_red = pixel->red - cluster->center.red;
-			double delta_green = pixel->green - cluster->center.green;
-			double delta_blue = pixel->blue - cluster->center.blue;
-			double dist = delta_red * delta_red + delta_green * delta_green + delta_blue * delta_blue;
-			dist_array[j] = dist;
-			////cout << "distance is: " << dist << endl; //testing
-		}
-
-
-		//Step2: sort the distance array
-		//2.1 Make a copy of dist_array
-		for (int i = 0; i < k; i++) {
-			dist_array_copy[i] = dist_array[i];
-		}
-		//2.2 Sort the dist_array
-		double temp;
-		for (int i = 0; i < k; i++)
-		{
-			for (int j = i + 1; j < k; j++)
-			{
-				//If there is a smaller element found on right of the array then swap it.
-				if (dist_array[j] < dist_array[i])
-				{
-					temp = dist_array[i];
-					dist_array[i] = dist_array[j];
-					dist_array[j] = temp;
-				}
-			}
-		}
-
-
-		std::map<int, int> dict_rank = {}; //store rank of the prototypes sorted \
-											   for this pixel according to the distances
-
-		//cout << "Inital dict_rank is: \n"; //testing
-		for (int i = 0; i < k; i++)
-		{
-			dict_rank.insert({ i, i });
-			//cout << i << ": " << dict_rank[i] << "\n"; //testing
-		}
-		//cout << endl; //testing
-
-		//Step 3: update rank of the prototypes sorted \
-			for this pixel according to the sorted distance array
-		for (int i = 0; i < k; i++)
-		{
-			for (int j = 0; j < k; j++) {
-				if (dist_array_copy[i] == dist_array[j]) {
-					dict_rank[i] = j;
-				}
-			}
-		}
-
-
-		for (int c = 0; c < k; c++)
-		{
-			//rank_array[i] = i + 1;
-			rank_array[i][c] = dict_rank[c]; //2d array of rank. For each pixel, \
-												 store rank of prototypes \
-												 sorted according to the distances
-		}
-
-
-	} //end of the loop to iterate over all pixels
-
-	//step4: calculate the cost function
-
-	double norm_factor = 0; //normalization factor
-	double integration = 0;
-	
-	//4.1 calculate the decay constant for this iteration
-	decay = decay_init * pow((0.01 / decay_init), (iter_cnt / 20.0));
-	//cout << "decay constant is: " << decay << endl;
-
-	//4.2 Calculate integration and norm_factor
-	for (int c = 0; c < k; c++) { //for each cluster
-		RGB_Cluster* cluster = &clusters[c]; // cache the cluster to limit the CPU keep accessing the memory
-
-		for (int p = 0; p < image_size; p++) {  // for all pixel //img->size , test with 2
-			RGB_Pixel* pixel = &img->data[p]; // cache the pixel to limit the CPU keep accessing the memory 6 times
-			double delta_red = pixel->red - cluster->center.red;
-			double delta_green = pixel->green - cluster->center.green;
-			double delta_blue = pixel->blue - cluster->center.blue;
-			double euclidean_norm = sqrt(delta_red * delta_red + delta_green * delta_green + delta_blue * delta_blue);
-			integration += exp(-rank_array[p][c] / decay) * euclidean_norm * (1.0 / img->size); //testing //1.5258789062500000e-05 //probability(img, *pixel)
-			norm_factor += exp(-rank_array[p][c] / decay);
-		}
-	}
-	
-	cost = integration / (2*norm_factor);
-	return cost;
-}
-
-double probability(const RGB_Image* img, RGB_Pixel pixel) { //not used 
-	int count = 0;
-	for (int i = 0; i < img->size/10; i++) { //iterate over pixels in the image //testing /4 only
-		RGB_Pixel* pixel_img = &img->data[i];
-		if (pixel_img->red == pixel.red && pixel_img->green == pixel.green && pixel_img->blue == pixel.blue) {
-			count++;
-		}
-	}
-	//double prob = 1.0 * count / img->size;
-	////printf("prob is %f", prob);
-	//if (count > 3) {
-	//	cout << "check it out" << endl;
-	//}
-	return 1.0 * count / img->size;
-}
-
-/*function_f used in the integral function*/
-double function_f(double x) { //not used
-	return x * x * x;
-}
-
-/*Integration of function_f using trapezoids:
-@parameters:
-lower_bound: lower bound of integration
-uppper_bound: upppe bound of integration
-steps: number of steps (or small trapezoids) */
-double integral(double lower_bound, double uppper_bound, int steps) { //not used
-	double height; //height of all small rectangles
-	double area = 0; //sum of the area of all small trapezoids
-	height = (uppper_bound - lower_bound) / steps;
-	area += (function_f(lower_bound) + function_f(uppper_bound)) / 2;
-	for (int i = 1; i < steps; i++) {
-		area += function_f(lower_bound + i * height); //sum of all the base
-	}
-	area = area * height; //all the small trapezoids have the same height
-	return area;
-}
-
 
 /*Save new image by assigning each pixel to the its belonging cluster's centroid*/
 void save_new_img(const RGB_Image* img, RGB_Cluster* clusters, int k) {
@@ -927,8 +617,6 @@ int main(int argc, char* argv[])
 	RGB_Image* img;
 	//RGB_Image* out_img;//not sure if we need it?
 	RGB_Cluster* clusters;
-	RGB_Image img_copy; //testing
-	RGB_Image* img_copy_ptr; //testing
 
 	if (argc == 3) {
 		/* Image filename */
@@ -955,72 +643,14 @@ int main(int argc, char* argv[])
 	/* Read Image*/
 	img = read_PPM(filename);
 
-	img_copy = *img;
-	img_copy_ptr = &img_copy;
-
-
-	////test neural batch begin
-	///* Initialize centers */
-	//clusters = gen_rand_centers(img, k);
-	////batch_kmeans(img, k, clusters);
-	//batch_neural_gas(img, k, clusters);
-
-	////calculate Mean Squared Error (MSE)
-	//double MSE = calcMSE(img, clusters, k);
-	//printf("Mean Squared Error (MSE) is: %f \n", MSE);
-
-	////save new image with new clusters found
-	//save_new_img(img, clusters, k);
-
-	////Make new image by writing to ppm file
-	//write_PPM(img, "outputting_img.ppm");
-
-	//cout << "\n------------------Finished running--------------------" << endl << endl;
-
-	////end test neural batch
-
-
-	////testing
-	///*cout << endl;
-	//cout << "image is: " << img << endl;
-	//cout << "img->width:  " << img->width << endl;
-	//cout << "img->height: " << img->height << endl;
-	//cout << "img->size: " << img->size << endl;*/
-
-	///*cout << *(&img->data[num_pixels+5].red) << endl;
-	//cout << *(&img->data[num_pixels+5].green) << endl;
-	//cout << *(&img->data[num_pixels+5].blue) << endl << endl;*/
-
-	////testing
-	///*for (int i = 0; i < 3; i++) {
-	//	cout << i << " pixel: " << *(&img->data[i].red) << "," << *(&img->data[i].green)
-	//		<< "," << *(&img->data[i].blue) << endl;
-	//}
-
-	//cout << "first pixel address is: " << &img->data[0].red << "," << &img->data[0].green << "," << &img->data[0].blue << "," << endl;
-	//cout << "second pixel address is: " << &img->data[1].red << "," << &img->data[1].green << "," << &img->data[1].blue << "," << endl;*/
-
-
-	/* Test Batch K-Means*/
+	/* Test Batch Neural Gas*/
 	/* Start Timer*/
 	auto start = std::chrono::high_resolution_clock::now();
-
-	/*testing delete after done*/
-	//cout << endl;
-	//for (int i = 0; i < 3; i++) {
-	//	printf("Cluster %d's size is %d \n", i, *(&cluster->size));
-	//	//printf("Cluster %d's center is %d %d %d \n", i, (cluster+i)->center.red, (cluster + i)->center.green, (cluster + i)->center.blue);
-	//	cout << "Cluster " << i << "'s center is: " << (cluster+i)->center.red << "," << (cluster+i)->center.green << "," << (cluster+i)->center.blue << endl << endl;
-	//}
-
-	/* Implement Batch K-means*/
 	cout << endl;
 	/* Initialize centers */
 	clusters = gen_rand_centers(img, k);
 	//batch_kmeans(img, k, clusters);
 	batch_neural_gas(img, k, clusters);
-
-	//string output_img_name = "outputting_img_" + to_string(k) + ".ppm"; //testing
 
 	//calculate Mean Squared Error (MSE)
 	double MSE = calcMSE(img, clusters, k);
@@ -1043,9 +673,6 @@ int main(int argc, char* argv[])
 	std::chrono::duration<double> diff = stop - start;
 
 	std::cout << "Time to run is: " << diff.count() << " s\n";
-
-
-
 
 	free(clusters);
 	free_img(img);
