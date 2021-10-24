@@ -34,12 +34,12 @@ a. Original picture
 
 b. Applied Batch Neural Gas with k = 2
 <p>
-<img width="256" src="./img/outputting_kmean_2.jpg">
+<img width="256" src="./img/outputting_bng_2.jpg">
 </p>
 
 c. Applied Batch Neural Gas with k = 3
 <p>
-<img width="256" src="./img/outputting_kmean_3.jpg">
+<img width="256" src="./img/outputting_bng_3.jpg">
 </p>
 
 d. Run time
