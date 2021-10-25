@@ -1,0 +1,155 @@
+sample_image.ppm 3
+
+decay constant is: 1.5
+Iteration 1: cost = 52823577.586320534
+Iteration 1: relative_cost = 1.000000000
+Iteration 1: MSE = 7457.4381
+----------------End of Iteration 1--------------
+
+decay constant is: 1.42669
+Iteration 2: cost = 40768004.636063524
+Iteration 2: relative_cost = 0.295711626
+Iteration 2: MSE = 5879.7100
+----------------End of Iteration 2--------------
+
+decay constant is: 1.35697
+Iteration 3: cost = 40238154.386858001
+Iteration 3: relative_cost = 0.013167857
+Iteration 3: MSE = 5362.8996
+----------------End of Iteration 3--------------
+
+decay constant is: 1.29065
+Iteration 4: cost = 39590364.799018063
+Iteration 4: relative_cost = 0.016362304
+Iteration 4: MSE = 5209.0274
+----------------End of Iteration 4--------------
+
+decay constant is: 1.22757
+Iteration 5: cost = 38856853.383088075
+Iteration 5: relative_cost = 0.018877273
+Iteration 5: MSE = 5089.4097
+----------------End of Iteration 5--------------
+
+decay constant is: 1.16758
+Iteration 6: cost = 38128098.419704422
+Iteration 6: relative_cost = 0.019113331
+Iteration 6: MSE = 4971.3444
+----------------End of Iteration 6--------------
+
+decay constant is: 1.11052
+Iteration 7: cost = 37412513.844141863
+Iteration 7: relative_cost = 0.019126878
+Iteration 7: MSE = 4845.6116
+----------------End of Iteration 7--------------
+
+decay constant is: 1.05625
+Iteration 8: cost = 36717951.100216441
+Iteration 8: relative_cost = 0.018916163
+Iteration 8: MSE = 4689.2787
+----------------End of Iteration 8--------------
+
+decay constant is: 1.00462
+Iteration 9: cost = 36065667.973472647
+Iteration 9: relative_cost = 0.018085985
+Iteration 9: MSE = 4433.7750
+----------------End of Iteration 9--------------
+
+decay constant is: 0.955527
+Iteration 10: cost = 35523695.221697971
+Iteration 10: relative_cost = 0.015256655
+Iteration 10: MSE = 4174.6318
+----------------End of Iteration 10--------------
+
+decay constant is: 0.908829
+Iteration 11: cost = 35077224.617148377
+Iteration 11: relative_cost = 0.012728219
+Iteration 11: MSE = 4046.0526
+----------------End of Iteration 11--------------
+
+decay constant is: 0.864413
+Iteration 12: cost = 34517499.909759663
+Iteration 12: relative_cost = 0.016215679
+Iteration 12: MSE = 3945.0229
+----------------End of Iteration 12--------------
+
+decay constant is: 0.822168
+Iteration 13: cost = 33933711.117264830
+Iteration 13: relative_cost = 0.017203800
+Iteration 13: MSE = 3853.6571
+----------------End of Iteration 13--------------
+
+decay constant is: 0.781987
+Iteration 14: cost = 33357434.522578541
+Iteration 14: relative_cost = 0.017275807
+Iteration 14: MSE = 3768.8734
+----------------End of Iteration 14--------------
+
+decay constant is: 0.74377
+Iteration 15: cost = 32800402.415139768
+Iteration 15: relative_cost = 0.016982478
+Iteration 15: MSE = 3690.2140
+----------------End of Iteration 15--------------
+
+decay constant is: 0.70742
+Iteration 16: cost = 32267044.767107148
+Iteration 16: relative_cost = 0.016529485
+Iteration 16: MSE = 3617.6747
+----------------End of Iteration 16--------------
+
+decay constant is: 0.672848
+Iteration 17: cost = 31760114.416229166
+Iteration 17: relative_cost = 0.015961226
+Iteration 17: MSE = 3550.9908
+----------------End of Iteration 17--------------
+
+decay constant is: 0.639964
+Iteration 18: cost = 31281289.903004330
+Iteration 18: relative_cost = 0.015307058
+Iteration 18: MSE = 3490.1983
+----------------End of Iteration 18--------------
+
+decay constant is: 0.608688
+Iteration 19: cost = 30833114.981928568
+Iteration 19: relative_cost = 0.014535506
+Iteration 19: MSE = 3435.0582
+----------------End of Iteration 19--------------
+
+decay constant is: 0.57894
+Iteration 20: cost = 30417083.694605578
+Iteration 20: relative_cost = 0.013677553
+Iteration 20: MSE = 3385.3034
+----------------End of Iteration 20--------------
+
+decay constant is: 0.550647
+Iteration 21: cost = 30035054.870049167
+Iteration 21: relative_cost = 0.012719432
+Iteration 21: MSE = 3340.5938
+----------------End of Iteration 21--------------
+
+decay constant is: 0.523736
+Iteration 22: cost = 29689582.456419356
+Iteration 22: relative_cost = 0.011636149
+Iteration 22: MSE = 3300.6127
+----------------End of Iteration 22--------------
+
+decay constant is: 0.49814
+Iteration 23: cost = 29381951.766875830
+Iteration 23: relative_cost = 0.010470056
+Iteration 23: MSE = 3264.6187
+----------------End of Iteration 23--------------
+
+decay constant is: 0.473795
+Iteration 24: cost = 29116080.212566454
+Iteration 24: relative_cost = 0.009131434
+Iteration 24: MSE = 3232.4474
+----------------End of Iteration 24--------------
+
+Final clusters' centers are:
+Cluster 0's center is: 173.518,125.517,90.9197
+Cluster 1's center is: 90.5018,90.7899,73.5131
+Cluster 2's center is: 149.845,174.646,181.192
+Mean Squared Error (MSE) is: 3232.447363
+
+------------------Finished running--------------------
+
+Time to run is: 3.79257 s

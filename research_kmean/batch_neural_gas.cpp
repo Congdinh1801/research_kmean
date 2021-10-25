@@ -324,6 +324,11 @@ double calcMSE(const RGB_Image* img, RGB_Cluster* clusters, int k);
 /* Color quantization using the batch k-means algorithm */
 void batch_kmeans(const RGB_Image* img, const int k, RGB_Cluster* clusters)
 {
+	//batch_kmeans(img, k, INT_MAX, cluster);
+	//printf("Cluster %d's size is %d \n", i, *(&cluster->size));
+	////printf("Cluster %d's center is %d %d %d \n", i, (cluster+i)->center.red, (cluster + i)->center.green, (cluster + i)->center.blue);
+	//cout << "Cluster " << i << "'s center is: " << (cluster + i)->center.red << "," << (cluster + i)->center.green << "," << (cluster + i)->center.blue << endl << endl;
+
 	//step 1: initializing random centroids (aldready done in main)
 
 	//Declare variables
@@ -336,6 +341,20 @@ void batch_kmeans(const RGB_Image* img, const int k, RGB_Cluster* clusters)
 	for (int i = 0; i < img->size; i++) {
 		pixels_member[i] = -1;
 	}
+
+	////testing
+	//cout << "pixels_member before: " << endl;
+	//cout << pixels_member[0] << endl;
+	//cout << pixels_member[1] << endl;
+	//cout << pixels_member[2] << endl;
+
+	//testing for initial clusters' centers
+	//cout << "Initial clusters' centers are: " << endl;
+	//for (int i = 0; i < k; i++) {
+	//	printf("Cluster %d's size is %d \n", i, *(&clusters->size));
+	//	//printf("Cluster %d's center is %d %d %d \n", i, (cluster+i)->center.red, (cluster + i)->center.green, (cluster + i)->center.blue);
+	//	cout << "Cluster " << i << "'s center is: " << (clusters + i)->center.red << "," << (clusters + i)->center.green << "," << (clusters + i)->center.blue << endl << endl;
+	//}
 
 	/*step2: loop and stop until all pixels stop changing their memberships */
 	while (true)
@@ -393,6 +412,12 @@ void batch_kmeans(const RGB_Image* img, const int k, RGB_Cluster* clusters)
 			SSE += min_dist;
 		}
 
+		////testing
+		//cout << "pixels_member after: " << endl;
+		//cout << pixels_member[0] << endl;
+		//cout << pixels_member[1] << endl;
+		//cout << pixels_member[2] << endl;
+
 		//cout << "num_pts_change is: " << num_pts_change << endl; //testing
 
 		//step4: Recompute the cetroid of each cluster
@@ -405,7 +430,8 @@ void batch_kmeans(const RGB_Image* img, const int k, RGB_Cluster* clusters)
 				cluster->center.blue = center_temp->blue / cluster->size;
 			}
 		}
-		printf("Iteration %d: SSE = %0.4f\n", iter_cnt + 1, SSE);
+		printf("Iteration %d: MSE = %0.4f\n", iter_cnt + 1, calcMSE(img, clusters, k));
+		//printf("Iteration %d: SSE = %0.4f\n", iter_cnt + 1, SSE);
 
 		//Step 5: If points stop changing their memberships, stop the loop
 		if (num_pts_change == 0) {
@@ -413,6 +439,26 @@ void batch_kmeans(const RGB_Image* img, const int k, RGB_Cluster* clusters)
 		}
 		iter_cnt++;
 	}
+
+	//testing 
+	//double MSE = SSE / img->size; //testing
+	//printf("\ntesting, Mean Squared Error (MSE) is: %f \n", MSE); //testing
+
+	/*unsigned int size_total = 0;
+	cout << "\n\nResulted clusters are: " << endl;
+	for (int i = 0; i < k; i++) {
+		if ((clusters + i)->size == 0) {
+			printf("cluster %d has size 0, skip\n\n", i);
+			continue;
+		}
+		printf("Cluster %d's size is %d \n", i, clusters[i].size);
+		size_total += clusters[i].size;
+		cout << "Cluster " << i << "'s center is: " << (clusters + i)->center.red << "," << (clusters + i)->center.green << "," << (clusters + i)->center.blue << endl << endl;
+	}
+	cout << "size_total is: " << size_total << endl;
+	if (num_pixels != size_total) {
+		printf("the size total is different. Should be 262144\n");
+	}*/
 
 	// Free the memory 
 	free(centers_temp);
@@ -423,9 +469,15 @@ void batch_neural_gas(const RGB_Image* img, const int k, RGB_Cluster* clusters) 
 	//step 1: initializing random centroids (aldready done in main)
 
 	//Declare variables
-	vector<double> dist_array; //distances between pixel and prototype
+
+	vector<double> LUT_h_func; //look up table for h_function
+
+	vector<double> euclidean_norm;
+	vector<double> dist_array;
+	//vector<double> weights;
 	double* weights = (double*)malloc(k * sizeof(double)); /*temporary weights*/
 	RGB_Pixel* centers_temp = (RGB_Pixel*)malloc(k * sizeof(RGB_Pixel)); /*temporary centers of clusters in current iteration*/
+
 
 	double lambda_initial = k / 2.0;
 	double lambda;
@@ -440,6 +492,17 @@ void batch_neural_gas(const RGB_Image* img, const int k, RGB_Cluster* clusters) 
 	/*step2: loop and stop until convergence threashold is reached or max iteration is reached*/
 	while (iter_cnt < MAX_ITERS && relative_cost > CONV_THRESH) //MAX_ITERS 
 	{
+		//First, calculate the decay constant for this iteration
+		//double test = pow((LAMBDA_FINAL / lambda_initial), (iter_cnt * 1.0 / MAX_ITERS));
+		lambda = lambda_initial * pow((LAMBDA_FINAL / lambda_initial), (iter_cnt / (double)MAX_ITERS)); //20.0  //MAX_ITERS
+		cout << "decay constant is: " << lambda << endl; //testing
+
+		//Look up table for h_function
+		LUT_h_func.clear(); //reset LUT
+		for (int j = 0; j < k; j++) {
+			LUT_h_func.push_back(exp(-j / lambda));
+		}
+
 		//reset centers_temp and weights
 		for (int i = 0; i < k; i++) {
 			RGB_Pixel* center_temp = &centers_temp[i];
@@ -453,19 +516,19 @@ void batch_neural_gas(const RGB_Image* img, const int k, RGB_Cluster* clusters) 
 		current_cost = 0;
 
 		/*step3: Compute Euclidean distance and sorted the distance for all prototype*/
-		//First, calculate the decay constant for this iteration
-		lambda = lambda_initial * pow((LAMBDA_FINAL / lambda_initial), (iter_cnt * 1.0 / MAX_ITERS)); //20.0  //MAX_ITERS
-		cout << "decay constant is: " << lambda << endl; //testing
-
 		//Iterate over each pixel in the img		//img->size //testing with 10 pixels
 		for (int i = 0; i < img->size; i++) {
 
 			RGB_Pixel* pixel = &img->data[i]; // cache the pixel to limit the CPU keep accessing the memory
+			//cout << "\nrgb is: " << pixel->red << "," << pixel->green << "," << pixel->blue << endl; //testing
+
 			//reset dist_array
 			dist_array.clear();
+			euclidean_norm.clear();
+
 
 			//3.1 calculate distance of this pixel to each centroid using Squared Euclidean distance  \
-			and add it to dist_array
+			and add it to distances array
 			for (int j = 0; j < k; j++) {
 				RGB_Cluster* cluster = &clusters[j];
 				double delta_red = pixel->red - cluster->center.red;
@@ -473,6 +536,10 @@ void batch_neural_gas(const RGB_Image* img, const int k, RGB_Cluster* clusters) 
 				double delta_blue = pixel->blue - cluster->center.blue;
 				double dist = delta_red * delta_red + delta_green * delta_green + delta_blue * delta_blue;
 				dist_array.push_back(dist);
+				////cout << "distance is: " << dist << endl; //testing
+
+				//Save euclidean_norm later for 3.3.2: cost function
+				euclidean_norm.push_back(sqrt(dist));
 			}
 
 			//3.2 Sort the distances and get the rank of prototypes
@@ -486,25 +553,22 @@ void batch_neural_gas(const RGB_Image* img, const int k, RGB_Cluster* clusters) 
 				}
 			);
 
-			//3.4: calculate the cost function and updating for prototypes
+			//3.3: calculate the cost function and updating for prototypes
 			for (int j = 0; j < k; j++) { //for each cluster
 				//3.3.1 compute the updating for prototypes according to rank to each centroid for this pixel
-				double h_func = exp(-index_rank[j] / lambda);
-				centers_temp[j].red += h_func * pixel->red;
-				centers_temp[j].green += h_func * pixel->green;
-				centers_temp[j].blue += h_func * pixel->blue;
-				weights[j] += h_func;
+				int index = index_rank[j];
+				double h_func = LUT_h_func[j]; //cache it for faster
+				centers_temp[index].red += h_func * pixel->red;
+				centers_temp[index].green += h_func * pixel->green;
+				centers_temp[index].blue += h_func * pixel->blue;
+				weights[index] += h_func;
+
 				//3.3.2: calculate the cost function
-				RGB_Cluster* cluster = &clusters[j]; // cache the cluster to limit the CPU keep accessing the memory
-				double delta_red = pixel->red - cluster->center.red;
-				double delta_green = pixel->green - cluster->center.green;
-				double delta_blue = pixel->blue - cluster->center.blue;
-				double euclidean_norm = sqrt(delta_red * delta_red + delta_green * delta_green + delta_blue * delta_blue);
-				current_cost += h_func * euclidean_norm; //testing //1.5258789062500000e-05 //probability(img, *pixel)
+				current_cost += h_func * euclidean_norm[j]; //testing //1.5258789062500000e-05 //probability(img, *pixel)
 			}
 		}	//end of the loop to iterate over all pixels
 
-		//step4: Recompute the cetroid of each cluster
+		//Step4: Recompute the cetroid of each cluster
 		for (int j = 0; j < k; j++) {
 			RGB_Cluster* cluster = &clusters[j];
 			RGB_Pixel* center_temp = &centers_temp[j];
@@ -516,11 +580,12 @@ void batch_neural_gas(const RGB_Image* img, const int k, RGB_Cluster* clusters) 
 
 		//Calculate relative cost
 		if (iter_cnt == 0) {
-			relative_cost = 1; // anything > CONV_THRESH (0.01)
+			relative_cost = 1; // anything > CONV_THRESH (0.001)
 		}
 		else {
 			relative_cost = (previous_cost - current_cost) / current_cost;
 		}
+
 
 		printf("Iteration %d: cost = %.9f\n", iter_cnt + 1, current_cost);
 		printf("Iteration %d: relative_cost = %.9f\n", iter_cnt + 1, relative_cost);
@@ -533,7 +598,16 @@ void batch_neural_gas(const RGB_Image* img, const int k, RGB_Cluster* clusters) 
 		previous_cost = current_cost; //update previous cost
 		iter_cnt++; //update counter
 	}
+
+	//testing clusters' centers after the algorithm
+	cout << "Final clusters' centers are: " << endl;
+	for (int i = 0; i < k; i++) {
+		//printf("Cluster %d's size is %d \n", i, *(&clusters->size));
+		//printf("Cluster %d's center is %d %d %d \n", i, (cluster+i)->center.red, (cluster + i)->center.green, (cluster + i)->center.blue);
+		cout << "Cluster " << i << "'s center is: " << (clusters + i)->center.red << "," << (clusters + i)->center.green << "," << (clusters + i)->center.blue << endl;
+	}
 }
+
 
 /*Save new image by assigning each pixel to the its belonging cluster's centroid*/
 void save_new_img(const RGB_Image* img, RGB_Cluster* clusters, int k) {
