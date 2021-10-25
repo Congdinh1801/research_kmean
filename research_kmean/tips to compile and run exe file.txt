@@ -1,5 +1,5 @@
 to compile test.exe: 
-g++ skeleton.cpp -o test.exe
+g++ batch_neural_gas.cpp -o batch_neural_gas.exe
 
 to run test.exe: 
-test.exe "sample_image.ppm" 2
+batch_neural_gas.exe "sample_image.ppm" 2
