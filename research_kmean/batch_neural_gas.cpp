@@ -324,11 +324,6 @@ double calcMSE(const RGB_Image* img, RGB_Cluster* clusters, int k);
 /* Color quantization using the batch k-means algorithm */
 void batch_kmeans(const RGB_Image* img, const int k, RGB_Cluster* clusters)
 {
-	//batch_kmeans(img, k, INT_MAX, cluster);
-	//printf("Cluster %d's size is %d \n", i, *(&cluster->size));
-	////printf("Cluster %d's center is %d %d %d \n", i, (cluster+i)->center.red, (cluster + i)->center.green, (cluster + i)->center.blue);
-	//cout << "Cluster " << i << "'s center is: " << (cluster + i)->center.red << "," << (cluster + i)->center.green << "," << (cluster + i)->center.blue << endl << endl;
-
 	//step 1: initializing random centroids (aldready done in main)
 
 	//Declare variables
@@ -341,20 +336,6 @@ void batch_kmeans(const RGB_Image* img, const int k, RGB_Cluster* clusters)
 	for (int i = 0; i < img->size; i++) {
 		pixels_member[i] = -1;
 	}
-
-	////testing
-	//cout << "pixels_member before: " << endl;
-	//cout << pixels_member[0] << endl;
-	//cout << pixels_member[1] << endl;
-	//cout << pixels_member[2] << endl;
-
-	//testing for initial clusters' centers
-	//cout << "Initial clusters' centers are: " << endl;
-	//for (int i = 0; i < k; i++) {
-	//	printf("Cluster %d's size is %d \n", i, *(&clusters->size));
-	//	//printf("Cluster %d's center is %d %d %d \n", i, (cluster+i)->center.red, (cluster + i)->center.green, (cluster + i)->center.blue);
-	//	cout << "Cluster " << i << "'s center is: " << (clusters + i)->center.red << "," << (clusters + i)->center.green << "," << (clusters + i)->center.blue << endl << endl;
-	//}
 
 	/*step2: loop and stop until all pixels stop changing their memberships */
 	while (true)
@@ -412,12 +393,6 @@ void batch_kmeans(const RGB_Image* img, const int k, RGB_Cluster* clusters)
 			SSE += min_dist;
 		}
 
-		////testing
-		//cout << "pixels_member after: " << endl;
-		//cout << pixels_member[0] << endl;
-		//cout << pixels_member[1] << endl;
-		//cout << pixels_member[2] << endl;
-
 		//cout << "num_pts_change is: " << num_pts_change << endl; //testing
 
 		//step4: Recompute the cetroid of each cluster
@@ -430,8 +405,7 @@ void batch_kmeans(const RGB_Image* img, const int k, RGB_Cluster* clusters)
 				cluster->center.blue = center_temp->blue / cluster->size;
 			}
 		}
-		printf("Iteration %d: MSE = %0.4f\n", iter_cnt + 1, calcMSE(img, clusters, k));
-		//printf("Iteration %d: SSE = %0.4f\n", iter_cnt + 1, SSE);
+		printf("Iteration %d: SSE = %0.4f\n", iter_cnt + 1, SSE);
 
 		//Step 5: If points stop changing their memberships, stop the loop
 		if (num_pts_change == 0) {
@@ -439,26 +413,6 @@ void batch_kmeans(const RGB_Image* img, const int k, RGB_Cluster* clusters)
 		}
 		iter_cnt++;
 	}
-
-	//testing 
-	//double MSE = SSE / img->size; //testing
-	//printf("\ntesting, Mean Squared Error (MSE) is: %f \n", MSE); //testing
-
-	/*unsigned int size_total = 0;
-	cout << "\n\nResulted clusters are: " << endl;
-	for (int i = 0; i < k; i++) {
-		if ((clusters + i)->size == 0) {
-			printf("cluster %d has size 0, skip\n\n", i);
-			continue;
-		}
-		printf("Cluster %d's size is %d \n", i, clusters[i].size);
-		size_total += clusters[i].size;
-		cout << "Cluster " << i << "'s center is: " << (clusters + i)->center.red << "," << (clusters + i)->center.green << "," << (clusters + i)->center.blue << endl << endl;
-	}
-	cout << "size_total is: " << size_total << endl;
-	if (num_pixels != size_total) {
-		printf("the size total is different. Should be 262144\n");
-	}*/
 
 	// Free the memory 
 	free(centers_temp);
