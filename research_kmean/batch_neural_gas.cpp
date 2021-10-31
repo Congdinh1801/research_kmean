@@ -1,11 +1,12 @@
 ﻿#include <map>
 #include <math.h>       /* pow */
-
 #include <vector>
 #include <algorithm>    // std::sort, std::stable_sort
-
 #include <chrono>
 #include <iostream>
+
+#include <string>
+#include <fstream>
 
 #pragma warning(disable:4996)
 
@@ -50,6 +51,7 @@ typedef struct
 #define LAMBDA_FINAL 0.01	/*decay constant final*/
 #define MAX_ITERS 100		// maximum number of iteration, default 100
 #define CONV_THRESH 0.01	//convergence threshold, default ε = 0.001
+#define MAX_RGB_DIST 195075 //195075 = 255^2 * 3 - 0; since each pixel can be from 0 to 255
 
 //testing
 //#define num_pixels 262144	//testing 512*512=262144
@@ -322,12 +324,12 @@ RGB_Cluster* gen_rand_centers(const RGB_Image* img, const int k) {
 double calcMSE(const RGB_Image* img, RGB_Cluster* clusters, int k);
 
 /* Color quantization using the batch k-means algorithm */
-void batch_kmeans(const RGB_Image* img, const int k, RGB_Cluster* clusters)
+void batch_kmeans(const RGB_Image* img, const int k, RGB_Cluster* clusters, double* obj, int* iter_cnt)
 {
 	//step 1: initializing random centroids (aldready done in main)
 
 	//Declare variables
-	int iter_cnt = 0;
+	//int iter_cnt = 0;
 	double SSE = 0;
 	RGB_Pixel* centers_temp = (RGB_Pixel*)malloc(k * sizeof(RGB_Pixel)); /*temporary centers of clusters in current iteration*/
 	int num_pts_change = 0;
@@ -363,7 +365,7 @@ void batch_kmeans(const RGB_Image* img, const int k, RGB_Cluster* clusters)
 			RGB_Pixel* pixel = &img->data[i]; // cache the pixel to limit the CPU keep accessing the memory 6 times
 
 			//cout << "\nrgb is: " << pixel->red << "," << pixel->green << "," << pixel->blue << endl; //testing
-			double min_dist = TOTAL_PIXELS; //initiazize a big number
+			double min_dist = MAX_RGB_DIST; //initiazize to be maximum distance possible between 2 pixels
 			int min_index = -1; //initiazize a big number
 			for (int j = 0; j < k; j++) {
 				RGB_Cluster* cluster = &clusters[j];
@@ -405,13 +407,15 @@ void batch_kmeans(const RGB_Image* img, const int k, RGB_Cluster* clusters)
 				cluster->center.blue = center_temp->blue / cluster->size;
 			}
 		}
-		printf("Iteration %d: SSE = %0.4f\n", iter_cnt + 1, SSE);
+		//printf("Iteration %d: SSE = %0.4f\n", *iter_cnt + 1, SSE);
+		//printf("Iteration %d\n", *iter_cnt + 1); //testing
 
 		//Step 5: If points stop changing their memberships, stop the loop
 		if (num_pts_change == 0) {
 			break;
 		}
-		iter_cnt++;
+		*obj = SSE;
+		*iter_cnt += 1; //update counter
 	}
 
 	// Free the memory 
@@ -419,35 +423,33 @@ void batch_kmeans(const RGB_Image* img, const int k, RGB_Cluster* clusters)
 }
 
 /* Color quantization using the batch neural gas algorithm */
-void batch_neural_gas(const RGB_Image* img, const int k, RGB_Cluster* clusters) {
+void batch_neural_gas(const RGB_Image* img, const int k, RGB_Cluster* clusters, double* obj, int* iter_cnt) {
 	//step 1: initializing random centroids (aldready done in main)
 
 	//Declare variables
 	double* LUT_h_func = (double*)malloc(k * sizeof(double)); //look up table for h_function
-	vector<double> dist_array; //distances array
+	//double* dist_array = (double*)malloc(k * sizeof(double)); //distances array
+	vector<double> dist_array;
 	double* weights = (double*)malloc(k * sizeof(double)); /*temporary weights*/
 	RGB_Pixel* centers_temp = (RGB_Pixel*)malloc(k * sizeof(RGB_Pixel)); /*temporary centers of clusters in current iteration*/
-	
-
 	double lambda_initial = k / 2.0;
 	double lambda;
-
 	double current_cost = 0;
 	double relative_cost = 1; //initialized with anything greater than CONV_THRESH(0.01)
 	double previous_cost = 0;
 
-	int iter_cnt = 0; //iteration counter
-	double SSE = 0; //sum squared error
+	//int iter_cnt = 0; //iteration counter
+	//double SSE = 0; //sum squared error, not objective functioin for bng
 
 	/*step2: loop and stop until convergence threashold is reached or max iteration is reached*/
-	while (iter_cnt < MAX_ITERS && relative_cost > CONV_THRESH) //MAX_ITERS 
+	while (*iter_cnt < MAX_ITERS && relative_cost > CONV_THRESH) //MAX_ITERS 
 	{
 		//iter_cnt < MAX_ITERS&& relative_cost > CONV_THRESH
 
 		//First, calculate the decay constant for this iteration
-		//double test = pow((LAMBDA_FINAL / lambda_initial), (iter_cnt * 1.0 / MAX_ITERS));
-		lambda = lambda_initial * pow((LAMBDA_FINAL / lambda_initial), (iter_cnt / (double)MAX_ITERS)); //20.0  //MAX_ITERS
-		cout << "decay constant is: " << lambda << endl; //testing
+		lambda = lambda_initial * pow((LAMBDA_FINAL / lambda_initial), (*iter_cnt / (double)MAX_ITERS)); //20.0  //MAX_ITERS
+		//cout << "decay constant is: " << lambda << endl; //testing
+		//cout << "*iter_cnt is : "<< *iter_cnt << endl;
 
 		//Look up table for h_function
 		for (int j = 0; j < k; j++) {
@@ -469,10 +471,10 @@ void batch_neural_gas(const RGB_Image* img, const int k, RGB_Cluster* clusters) 
 		/*step3: Compute Euclidean distance and sorted the distance for all prototype*/
 		//Iterate over each pixel in the img		//img->size //testing with 10 pixels
 		for (int i = 0; i < img->size; i++) {
-			
+
 			RGB_Pixel* pixel = &img->data[i]; // cache the pixel to limit the CPU keep accessing the memory
 			//cout << "\nrgb is: " << pixel->red << "," << pixel->green << "," << pixel->blue << endl; //testing
-			
+
 			//reset dist_array
 			dist_array.clear();
 
@@ -498,7 +500,7 @@ void batch_neural_gas(const RGB_Image* img, const int k, RGB_Cluster* clusters) 
 					return (dist_array[a] < dist_array[b]);
 				}
 			);
-			
+
 			//3.3: calculate the cost function and updating for prototypes
 			for (int j = 0; j < k; j++) { //for each cluster
 				//3.3.1 compute the updating for prototypes according to rank to each centroid for this pixel
@@ -525,46 +527,31 @@ void batch_neural_gas(const RGB_Image* img, const int k, RGB_Cluster* clusters) 
 		}
 
 		//Calculate relative cost
-		if (iter_cnt == 0) {
+		if (*iter_cnt == 0) {
 			relative_cost = 1; // anything > CONV_THRESH (0.001)
 		}
 		else {
 			relative_cost = (previous_cost - current_cost) / current_cost;
 		}
-		
-		
-		printf("Iteration %d: cost = %.9f\n", iter_cnt + 1, current_cost);
-		printf("Iteration %d: relative_cost = %.9f\n", iter_cnt + 1, relative_cost);
 
-		//testing SSE
-		printf("Iteration %d: MSE = %0.4f\n", iter_cnt + 1, calcMSE(img, clusters, k));
-		printf("----------------End of Iteration %d--------------\n\n", iter_cnt + 1);
-		
 		//Update previous_cost and iteration counter
 		previous_cost = current_cost; //update previous cost
-		iter_cnt++; //update counter
+		*iter_cnt += 1; //update counter
 	}
+	*obj = current_cost;
 
-	//testing clusters' centers after the algorithm
-	cout << "Final clusters' centers are: " << endl;
-	for (int i = 0; i < k; i++) {
-		//printf("Cluster %d's size is %d \n", i, *(&clusters->size));
-		//printf("Cluster %d's center is %d %d %d \n", i, (cluster+i)->center.red, (cluster + i)->center.green, (cluster + i)->center.blue);
-		cout << "Cluster " << i << "'s center is: " << (clusters + i)->center.red << "," << (clusters + i)->center.green << "," << (clusters + i)->center.blue << endl;
-	}
-	// Free the memory 
 	free(centers_temp);
 	free(weights);
 	free(LUT_h_func);
 }
 
 /*Save new image by assigning each pixel to the its belonging cluster's centroid*/
-void save_new_img(const RGB_Image* img, RGB_Cluster* clusters, int k) {
+void map_pixels(const RGB_Image* img, RGB_Cluster* clusters, int k) {
 	//Iterate over each pixel in the img
 	for (int i = 0; i < img->size; i++) { //loop to go over all pixels //img->size
 		RGB_Pixel* pixel = &img->data[i];
 		//cout << "\nrgb is: " << pixel->red << "," << pixel->green << "," << pixel->blue << endl; //testing
-		double min_dist = 1000000; //initiazize a big number
+		double min_dist = MAX_RGB_DIST; //initiazize to be maximum distance possible between 2 pixels
 		int min_index = -1; //initiazize a big number
 		for (int j = 0; j < k; j++) { //distance between the pixel with each centroid
 			RGB_Cluster* cluster = &clusters[j];
@@ -628,75 +615,240 @@ void free_img(const RGB_Image* img) {
 	delete(img);
 }
 
+vector<string> tokenize_img_file(string s, string del = " ")
+{
+	vector<string> image_file;
+	int start = 0;
+	int end = s.find(del);
+	while (end != -1) {
+		image_file.push_back(s.substr(start, end - start));
+		//cout << s.substr(start, end - start) << endl;
+		start = end + del.size() + 1;
+		end = s.find(del, start);
+	}
+	image_file.push_back(s.substr(start, end - start));
+	//cout << s.substr(start, end - start);
+	return image_file;
+}
+
+vector<int> tokenize_k_value(string s, string del = " ")
+{
+	vector<int> k_value;
+	int start = 0;
+	int end = s.find(del);
+	while (end != -1) {
+		k_value.push_back(stoi(s.substr(start, end - start))); //s.substr(start, end - start)
+		//cout << s.substr(start, end - start) << endl;
+		start = end + del.size() + 1;
+		end = s.find(del, start);
+	}
+	k_value.push_back(stoi(s.substr(start, end - start)));
+	//cout << s.substr(start, end - start);
+	return k_value;
+}
+
+
 
 int main(int argc, char* argv[])
 {
-	const char* filename;	//"sample_image.ppm" /* Filename Pointer*/ 
-	int k;				// Number of clusters
-
-	//const char* filename = "sample_image.ppm";	//"sample_image.ppm" /* Filename Pointer*/ 
-	//int k = 3;		//5			/* Number of clusters*/
+	//const char* filename;	//"sample_image.ppm" /* Filename Pointer*/ 
+	//int k;				// Number of clusters
+	string experiment_file;
 
 	RGB_Image* img;
 	//RGB_Image* out_img;//not sure if we need it?
 	RGB_Cluster* clusters;
 
-	if (argc == 3) {
+	if (argc == 2) {
 		/* Image filename */
-		filename = argv[1];
-
-		/* k, number of clusters */
-		k = atoi(argv[2]); // atoi function converts a string to an integer
-
+		experiment_file = argv[1];
 	}
-	else if (argc > 3) {
+	else if (argc > 2) {
 		printf("Too many arguments supplied.\n");
 		return 0;
 	}
 	else {
-		printf("Two arguments expected: image filename and number of clusters.\n");
+		printf("One argument expected: experiment filename.\n");
 		return 0;
 	}
-
 	srand(time(NULL));
-
 	/* Print Args*/
-	printf("%s %d\n", filename, k);
+	printf("%s \n", experiment_file.c_str());
 
-	/* Read Image*/
-	img = read_PPM(filename);
 
-	/* Test Batch Neural Gas*/
+	int counter = 0;
+	int num_runs;
+	vector<int> k_value;
+	vector<string> image_file;
+	//int* k_value = (int*)malloc(num_k_values * sizeof(int));
+	//str* image_file = (str*)malloc(num_images * sizeof(str));
+	//char** image_file = (char**)malloc(num_images * sizeof(char*));
+	fstream newfile;
+	newfile.open(experiment_file, ios::in); //open a file to perform read operation using file object
+	if (newfile.is_open()) {   //checking whether the file is open
+		string tp; //a line from file
+		while (getline(newfile, tp)) { //read a line from file object and put it into string.
+			if (counter == 0) {
+				image_file = tokenize_img_file(tp, ",");
+			}
+			else if (counter == 1) {
+				k_value = tokenize_k_value(tp, ",");
+			}
+			else {
+				num_runs = stoi(tp);
+			}
+			counter++;
+		}
+		newfile.close(); //close the file object.
+	}
+
 	/* Start Timer*/
-	auto start = std::chrono::high_resolution_clock::now();
-	cout << endl;
-	/* Initialize centers */
-	clusters = gen_rand_centers(img, k);
-	//batch_kmeans(img, k, clusters);
-	batch_neural_gas(img, k, clusters);
+	//auto start = std::chrono::high_resolution_clock::now();
 
-	//calculate Mean Squared Error (MSE)
-	double MSE = calcMSE(img, clusters, k);
-	printf("Mean Squared Error (MSE) is: %f \n", MSE);
+	double* bng_obj = (double*)malloc(num_runs * sizeof(double)); /*save obj for each run of bng */
+	int* bng_iters = (int*)malloc(num_runs * sizeof(int)); /*save iters for each run of bng*/
+	double* km_obj = (double*)malloc(num_runs * sizeof(double)); /*save obj for each run of k-means*/
+	int* km_iters = (int*)malloc(num_runs * sizeof(int)); /*save iters for each run of kmeans*/
 
-	//save new image with new clusters found
-	save_new_img(img, clusters, k);
+	for (int id = 0; id < image_file.size(); id++)
+	{
+		cout << "\nFor image: " << image_file[id] << endl; //testing
+		for (int ik = 0; ik < k_value.size(); ik++)
+		{
+			//reset bng_iters/bng_obj for each new k
+			for (int ir = 0; ir < num_runs; ir++)
+			{
+				bng_iters[ir] = 0;
+			}
+			for (int ir = 0; ir < num_runs; ir++)
+			{
+				bng_obj[ir] = 0;
+			}
+			//reset km_iters/km_obj for each new k
+			for (int ir = 0; ir < num_runs; ir++)
+			{
+				km_iters[ir] = 0;
+			}
+			for (int ir = 0; ir < num_runs; ir++)
+			{
+				km_obj[ir] = 0;
+			}
 
-	//Make new image by writing to ppm file
-	write_PPM(img, "outputting_img.ppm");
+			for (int ir = 0; ir < num_runs; ir++) // run num_runs for each image for a given k
+			{
+				/* Read Image*/
+				img = read_PPM(image_file[id].c_str());
+
+				/* Initialize centers */
+				clusters = gen_rand_centers(img, k_value[ik]);
+				RGB_Cluster clusters_copy;
+				clusters_copy = *clusters;
+
+				/*Run Batch Neural Gas and Batch K Mean*/
+				batch_kmeans(img, k_value[ik], clusters, &km_obj[ir], &km_iters[ir]);
+				//reset clusters since they are changed by previous algorithm
+				clusters = &clusters_copy;
+				batch_neural_gas(img, k_value[ik], clusters, &bng_obj[ir], &bng_iters[ir]);
+			}
+
+			//2. Calculate the mean/stdev of obj and iters for bng
+			printf("k = %d: \n", k_value[ik]); //testing
+			//2.1 Calculate the mean of iters for bng
+			double mean_iters_bng = 0;
+			double total_iters_bng = 0;
+			double stdev_iters_bng = 0;
+			for (int ir = 0; ir < num_runs; ir++)
+			{
+				total_iters_bng += bng_iters[ir];
+				//cout << "bng_iters[ir]: "<< bng_iters[ir] << endl; //testing 
+			}
+			mean_iters_bng = total_iters_bng / num_runs;
+			//cout << "mean_iters_bng is " << mean_iters_bng << endl; //testing
+			//2.2 Calculate the stdev of iters for bng
+			double variance = 0;
+			for (int ir = 0; ir < num_runs; ir++)
+			{
+				variance += (bng_iters[ir] - mean_iters_bng) * (bng_iters[ir] - mean_iters_bng);
+			}
+			stdev_iters_bng = variance / num_runs;
+			//cout << "stdev_iters_bng is " << stdev_iters_bng << endl; //testing
+
+			//2.3 Calculate the mean of obj for bng
+			double mean_obj_bng = 0;
+			double total_obj_bng = 0;
+			double stdev_obj_bng = 0;
+			for (int ir = 0; ir < num_runs; ir++)
+			{
+				total_obj_bng += bng_obj[ir];
+				//cout << "bng_obj[ir] " << bng_obj[ir] << endl; //testing
+			}
+			mean_obj_bng = total_obj_bng / num_runs;
+			//cout << "mean_obj_bng is " << mean_obj_bng << endl; //testing
+			//2.4 Calculate the stdev of obj for bng
+			double bng_obj_variance = 0;
+			for (int ir = 0; ir < num_runs; ir++)
+			{
+				bng_obj_variance += (bng_obj[ir] - mean_obj_bng) * (bng_obj[ir] - mean_obj_bng);
+			}
+			stdev_obj_bng = bng_obj_variance / num_runs;
+			//cout << "stdev_obj_bng is " << stdev_obj_bng << endl; //testing
+
+
+			//3. Calculate the mean/stdev of obj and iters for batch kmean
+			//3.1 Calculate the mean of iters for kmean
+			double mean_iters_km = 0;
+			double total_iters_km = 0;
+			double stdev_iters_km = 0;
+			for (int ir = 0; ir < num_runs; ir++)
+			{
+				total_iters_km += km_iters[ir];
+				//cout << "km_iters[ir]: " << km_iters[ir] << endl; //testing
+			}
+			mean_iters_km = total_iters_km / num_runs;
+			//cout << "mean_iters_km is " << mean_iters_km << endl; //testing
+			//3.2 Calculate the stdev of iters for kmean
+			double km_iters_variance = 0;
+			for (int ir = 0; ir < num_runs; ir++)
+			{
+				km_iters_variance += (km_iters[ir] - mean_iters_km) * (km_iters[ir] - mean_iters_km);
+			}
+			stdev_iters_km = km_iters_variance / num_runs;
+			//cout << "stdev_iters_km is " << stdev_iters_km << endl; //testing
+
+			//3.3 Calculate the mean of obj for kmean
+			double mean_obj_km = 0;
+			double total_obj_km = 0;
+			double stdev_obj_km = 0;
+			for (int ir = 0; ir < num_runs; ir++)
+			{
+				total_obj_km += km_obj[ir];
+				//cout << "km_obj[ir]: " << km_obj[ir] << endl; //testing
+			}
+			mean_obj_km = total_obj_km / num_runs;
+			//cout << "mean_obj_km is " << mean_obj_km << endl; //testing
+			//3.4 Calculate the stdev of obj for kmean
+			double km_obj_variance = 0;
+			for (int ir = 0; ir < num_runs; ir++)
+			{
+				km_obj_variance += (bng_obj[ir] - mean_obj_km) * (bng_obj[ir] - mean_obj_km);
+			}
+			stdev_obj_km = km_obj_variance / num_runs;
+
+			// display results for batch neural gas as "bng mean_obj stdev_obj mean_num_iters stdev_num_iters" 
+			printf("bng: %f, %f, %f, %f\n", mean_obj_bng, stdev_obj_bng, mean_iters_bng, stdev_iters_bng);
+			// display results for batch k-means as "bkm mean_obj stdev_obj mean_num_iters stdev_num_iters"
+			printf("bkm: %f, %f, %f, %f\n", mean_obj_km, stdev_obj_km, mean_iters_km, stdev_iters_km);
+		}
+	}
 
 	cout << "\n------------------Finished running--------------------" << endl << endl;
-	/* Stop Timer*/
-	auto stop = std::chrono::high_resolution_clock::now();
-	//auto stop = high_resolution_clock::now();
+	///* Stop Timer*/
+	//auto stop = std::chrono::high_resolution_clock::now();
 
-	/* Execution Time*/
-	//auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
+	//std::chrono::duration<double> diff = stop - start;
+	//printf("Time to run is: %.3f s", diff.count());
 
-	std::chrono::duration<double> diff = stop - start;
-
-	std::cout << "Time to run is: " << diff.count() << " s\n";
-
+	//Clean memory
 	free(clusters);
 	free_img(img);
 
