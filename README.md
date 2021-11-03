@@ -49,3 +49,8 @@ k = 2 <img width="400" height="600" src="./img/runtime_bng_2.JPG">
 <p>
 k = 3 <img width="400" height="600" src="./img/runtime_bng_3.JPG">
 </p>
+
+# III. Batch Kmean vs. Batch Neural Gas comparison
+<p>
+<img width="300" height="300" src="./img/result2.JPG">
+</p>
