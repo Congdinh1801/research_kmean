@@ -647,14 +647,49 @@ vector<int> tokenize_k_value(string s, string del = " ")
 	return k_value;
 }
 
+void calc_mean_stdev_iters(int* iters, int num_runs,
+	double* mean_iters, double* stdev_iters) {
+	//a. Calcuate the mean
+	double total_iters = 0.0;
+	for (int ir = 0; ir < num_runs; ir++)
+	{
+		total_iters += iters[ir];
+		//cout << "iters[ir]: " << iters[ir] << endl; //testing
+	}
+	*mean_iters = total_iters / num_runs;
+	//b. Calcuate the standard deviation
+	double iters_dev = 0.0; //squared deviation
+	for (int ir = 0; ir < num_runs; ir++)
+	{
+		iters_dev += (iters[ir] - *mean_iters) * (iters[ir] - *mean_iters);
+	}
+	*stdev_iters = sqrt(iters_dev / num_runs);
+}
 
+void calc_mean_stdev_objs(double* objs, int num_runs,
+	double* mean_objs, double* stdev_objs) {
+	//a. Calcuate the mean
+	double total_objs = 0.0;
+	for (int ir = 0; ir < num_runs; ir++)
+	{
+		total_objs += objs[ir];
+		//cout << "iters[ir]: " << iters[ir] << endl; //testing
+	}
+	*mean_objs = total_objs / num_runs;
+	//b. Calcuate the standard deviation
+	double objs_dev = 0.0; //squared deviation
+	for (int ir = 0; ir < num_runs; ir++)
+	{
+		objs_dev += (objs[ir] - *mean_objs) * (objs[ir] - *mean_objs);
+	}
+	*stdev_objs = sqrt(objs_dev / num_runs);
+}
 
 int main(int argc, char* argv[])
 {
 	//const char* filename;	//"sample_image.ppm" /* Filename Pointer*/ 
 	//int k;				// Number of clusters
 	string experiment_file;
-
 	RGB_Image* img;
 	//RGB_Image* out_img;//not sure if we need it?
 	RGB_Cluster* clusters;
@@ -675,14 +710,10 @@ int main(int argc, char* argv[])
 	/* Print Args*/
 	printf("%s \n", experiment_file.c_str());
 
-
 	int counter = 0;
 	int num_runs;
 	vector<int> k_value;
 	vector<string> image_file;
-	//int* k_value = (int*)malloc(num_k_values * sizeof(int));
-	//str* image_file = (str*)malloc(num_images * sizeof(str));
-	//char** image_file = (char**)malloc(num_images * sizeof(char*));
 	fstream newfile;
 	newfile.open(experiment_file, ios::in); //open a file to perform read operation using file object
 	if (newfile.is_open()) {   //checking whether the file is open
@@ -709,30 +740,23 @@ int main(int argc, char* argv[])
 	int* bng_iters = (int*)malloc(num_runs * sizeof(int)); /*save iters for each run of bng*/
 	double* km_obj = (double*)malloc(num_runs * sizeof(double)); /*save obj for each run of k-means*/
 	int* km_iters = (int*)malloc(num_runs * sizeof(int)); /*save iters for each run of kmeans*/
+	double mean_iters = 0.0;
+	double stdev_iters = 0.0;
+	double mean_objs = 0.0;
+	double stdev_objs = 0.0;
 
-	for (int id = 0; id < image_file.size(); id++)
+	for (int id = 0; id < image_file.size(); id++) //for each image file
 	{
 		cout << "\nFor image: " << image_file[id] << endl; //testing
-		for (int ik = 0; ik < k_value.size(); ik++)
+		for (int ik = 0; ik < k_value.size(); ik++) //for each k 
 		{
-			//reset bng_iters/bng_obj for each new k
+			//reset bng_iters/bng_obj and km_iters/km_obj for each new k
 			for (int ir = 0; ir < num_runs; ir++)
 			{
-				bng_iters[ir] = 0;
+				bng_obj[ir] = km_obj[ir] = 0.0;
+				bng_iters[ir] = km_iters[ir] = 0;
 			}
-			for (int ir = 0; ir < num_runs; ir++)
-			{
-				bng_obj[ir] = 0;
-			}
-			//reset km_iters/km_obj for each new k
-			for (int ir = 0; ir < num_runs; ir++)
-			{
-				km_iters[ir] = 0;
-			}
-			for (int ir = 0; ir < num_runs; ir++)
-			{
-				km_obj[ir] = 0;
-			}
+
 
 			for (int ir = 0; ir < num_runs; ir++) // run num_runs for each image for a given k
 			{
@@ -751,106 +775,32 @@ int main(int argc, char* argv[])
 				batch_neural_gas(img, k_value[ik], clusters, &bng_obj[ir], &bng_iters[ir]);
 			}
 
-			//2. Calculate the mean/stdev of obj and iters for bng
 			printf("k = %d: \n", k_value[ik]); //testing
-			//2.1 Calculate the mean of iters for bng
-			double mean_iters_bng = 0;
-			double total_iters_bng = 0;
-			double stdev_iters_bng = 0;
-			for (int ir = 0; ir < num_runs; ir++)
-			{
-				total_iters_bng += bng_iters[ir];
-				//cout << "bng_iters[ir]: "<< bng_iters[ir] << endl; //testing 
-			}
-			mean_iters_bng = total_iters_bng / num_runs;
-			//cout << "mean_iters_bng is " << mean_iters_bng << endl; //testing
-			//2.2 Calculate the stdev of iters for bng
-			double variance = 0;
-			for (int ir = 0; ir < num_runs; ir++)
-			{
-				variance += (bng_iters[ir] - mean_iters_bng) * (bng_iters[ir] - mean_iters_bng);
-			}
-			stdev_iters_bng = variance / num_runs;
-			//cout << "stdev_iters_bng is " << stdev_iters_bng << endl; //testing
 
-			//2.3 Calculate the mean of obj for bng
-			double mean_obj_bng = 0;
-			double total_obj_bng = 0;
-			double stdev_obj_bng = 0;
-			for (int ir = 0; ir < num_runs; ir++)
-			{
-				total_obj_bng += bng_obj[ir];
-				//cout << "bng_obj[ir] " << bng_obj[ir] << endl; //testing
-			}
-			mean_obj_bng = total_obj_bng / num_runs;
-			//cout << "mean_obj_bng is " << mean_obj_bng << endl; //testing
-			//2.4 Calculate the stdev of obj for bng
-			double bng_obj_variance = 0;
-			for (int ir = 0; ir < num_runs; ir++)
-			{
-				bng_obj_variance += (bng_obj[ir] - mean_obj_bng) * (bng_obj[ir] - mean_obj_bng);
-			}
-			stdev_obj_bng = bng_obj_variance / num_runs;
-			//cout << "stdev_obj_bng is " << stdev_obj_bng << endl; //testing
-
-
-			//3. Calculate the mean/stdev of obj and iters for batch kmean
-			//3.1 Calculate the mean of iters for kmean
-			double mean_iters_km = 0;
-			double total_iters_km = 0;
-			double stdev_iters_km = 0;
-			for (int ir = 0; ir < num_runs; ir++)
-			{
-				total_iters_km += km_iters[ir];
-				//cout << "km_iters[ir]: " << km_iters[ir] << endl; //testing
-			}
-			mean_iters_km = total_iters_km / num_runs;
-			//cout << "mean_iters_km is " << mean_iters_km << endl; //testing
-			//3.2 Calculate the stdev of iters for kmean
-			double km_iters_variance = 0;
-			for (int ir = 0; ir < num_runs; ir++)
-			{
-				km_iters_variance += (km_iters[ir] - mean_iters_km) * (km_iters[ir] - mean_iters_km);
-			}
-			stdev_iters_km = km_iters_variance / num_runs;
-			//cout << "stdev_iters_km is " << stdev_iters_km << endl; //testing
-
-			//3.3 Calculate the mean of obj for kmean
-			double mean_obj_km = 0;
-			double total_obj_km = 0;
-			double stdev_obj_km = 0;
-			for (int ir = 0; ir < num_runs; ir++)
-			{
-				total_obj_km += km_obj[ir];
-				//cout << "km_obj[ir]: " << km_obj[ir] << endl; //testing
-			}
-			mean_obj_km = total_obj_km / num_runs;
-			//cout << "mean_obj_km is " << mean_obj_km << endl; //testing
-			//3.4 Calculate the stdev of obj for kmean
-			double km_obj_variance = 0;
-			for (int ir = 0; ir < num_runs; ir++)
-			{
-				km_obj_variance += (bng_obj[ir] - mean_obj_km) * (bng_obj[ir] - mean_obj_km);
-			}
-			stdev_obj_km = km_obj_variance / num_runs;
-
+			//a. Calculate the mean/stdev of iters and objs for km
+			calc_mean_stdev_iters(km_iters, num_runs, &mean_iters, &stdev_iters);
+			calc_mean_stdev_objs(km_obj, num_runs, &mean_objs, &stdev_objs);
 			// display results for batch neural gas as "bng mean_obj stdev_obj mean_num_iters stdev_num_iters" 
-			printf("bng: %f, %f, %f, %f\n", mean_obj_bng, stdev_obj_bng, mean_iters_bng, stdev_iters_bng);
-			// display results for batch k-means as "bkm mean_obj stdev_obj mean_num_iters stdev_num_iters"
-			printf("bkm: %f, %f, %f, %f\n", mean_obj_km, stdev_obj_km, mean_iters_km, stdev_iters_km);
+			printf("bkm: %f, %f, %f, %f\n", mean_objs, stdev_objs, mean_iters, stdev_iters);
+
+			//b. Calculate the mean/stdev of iters and objs for bng
+			calc_mean_stdev_iters(bng_iters, num_runs, &mean_iters, &stdev_iters);
+			calc_mean_stdev_objs(bng_obj, num_runs, &mean_objs, &stdev_objs);
+			// display results for batch neural gas as "bng mean_obj stdev_obj mean_num_iters stdev_num_iters" 
+			printf("bng: %f, %f, %f, %f\n", mean_objs, stdev_objs, mean_iters, stdev_iters);
 		}
 	}
 
 	cout << "\n------------------Finished running--------------------" << endl << endl;
-	///* Stop Timer*/
-	//auto stop = std::chrono::high_resolution_clock::now();
 
-	//std::chrono::duration<double> diff = stop - start;
-	//printf("Time to run is: %.3f s", diff.count());
+	///* Stop Timer*/
+	/*auto stop = std::chrono::high_resolution_clock::now();
+	std::chrono::duration<double> diff = stop - start;
+	printf("Time to run is: %.3f s", diff.count());*/
 
 	//Clean memory
-	free(clusters);
-	free_img(img);
+	/*free(clusters);
+	free_img(img);*/
 
 	return 0;
 }
