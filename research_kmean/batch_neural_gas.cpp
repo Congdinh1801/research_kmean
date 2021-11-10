@@ -326,7 +326,7 @@ RGB_Cluster* gen_rand_centers(const RGB_Image* img, const int k) {
 double calcMSE(const RGB_Image* img, RGB_Cluster* clusters, int k);
 
 /* Color quantization using the batch k-means algorithm */
-void batch_kmeans(const RGB_Image* img, const int k, RGB_Cluster* clusters, double* obj, int* iter_cnt)
+void batch_kmeans(const RGB_Image* img, const int k, RGB_Cluster* clusters, double* obj, double* iter_cnt)
 {
 	//step 1: initializing random centroids (aldready done in main)
 
@@ -427,7 +427,7 @@ void batch_kmeans(const RGB_Image* img, const int k, RGB_Cluster* clusters, doub
 }
 
 /* Color quantization using the batch neural gas algorithm */
-void batch_neural_gas(const RGB_Image* img, const int k, RGB_Cluster* clusters, double* obj, int* iter_cnt) {
+void batch_neural_gas(const RGB_Image* img, const int k, RGB_Cluster* clusters, double* obj, double* iter_cnt) {
 	//step 1: initializing random centroids (aldready done in main)
 
 	//Declare variables
@@ -652,43 +652,25 @@ vector<int> tokenize_k_value(string s, string del = " ")
 	return k_value;
 }
 
-void calc_mean_stdev_iters(int* iters, int num_runs,
-	double* mean_iters, double* stdev_iters) {
+void calc_mean_stdev(double* objs, int num_runs,
+	double* mean, double* stdev) {
 	//a. Calcuate the mean
-	double total_iters = 0.0;
+	double total_input = 0.0;
 	for (int ir = 0; ir < num_runs; ir++)
 	{
-		total_iters += iters[ir];
+		total_input += objs[ir];
 		//cout << "iters[ir]: " << iters[ir] << endl; //testing
 	}
-	*mean_iters = total_iters / num_runs;
-	//b. Calcuate the standard deviation
-	double iters_dev = 0.0; //squared deviation
-	for (int ir = 0; ir < num_runs; ir++)
-	{
-		iters_dev += (iters[ir] - *mean_iters) * (iters[ir] - *mean_iters);
-	}
-	*stdev_iters = sqrt(iters_dev / num_runs);
-}
-
-void calc_mean_stdev_objs(double* objs, int num_runs,
-	double* mean_objs, double* stdev_objs) {
-	//a. Calcuate the mean
-	double total_objs = 0.0;
-	for (int ir = 0; ir < num_runs; ir++)
-	{
-		total_objs += objs[ir];
-		//cout << "iters[ir]: " << iters[ir] << endl; //testing
-	}
-	*mean_objs = total_objs / num_runs;
+	*mean = total_input / num_runs;
 	//b. Calcuate the standard deviation
 	double objs_dev = 0.0; //squared deviation
 	for (int ir = 0; ir < num_runs; ir++)
 	{
-		objs_dev += (objs[ir] - *mean_objs) * (objs[ir] - *mean_objs);
+		objs_dev += (objs[ir] - *mean) * (objs[ir] - *mean);
 	}
-	*stdev_objs = sqrt(objs_dev / num_runs);
+	*stdev = sqrt(objs_dev / num_runs);
 }
+
 RGB_Cluster* copy_clusters(const RGB_Cluster* clusters, int k) {
 	RGB_Cluster* clusters_copy = (RGB_Cluster*)malloc(k * sizeof(RGB_Cluster));
 	for (int i = 0; i < k; i++) {
@@ -766,9 +748,9 @@ int main(int argc, char* argv[])
 	clock_t begin = clock();
 
 	double* bng_obj = (double*)malloc(num_runs * sizeof(double)); /*save obj for each run of bng */
-	int* bng_iters = (int*)malloc(num_runs * sizeof(int)); /*save iters for each run of bng*/
+	double* bng_iters = (double*)malloc(num_runs * sizeof(double)); /*save iters for each run of bng*/
 	double* km_obj = (double*)malloc(num_runs * sizeof(double)); /*save obj for each run of k-means*/
-	int* km_iters = (int*)malloc(num_runs * sizeof(int)); /*save iters for each run of kmeans*/
+	double* km_iters = (double*)malloc(num_runs * sizeof(double)); /*save iters for each run of kmeans*/
 	double mean_iters = 0.0;
 	double stdev_iters = 0.0;
 	double mean_objs = 0.0;
@@ -805,14 +787,14 @@ int main(int argc, char* argv[])
 			fprintf(fp, "k = %d: \n", k_value[ik]);
 
 			//a. Calculate the mean/stdev of iters and objs for km
-			calc_mean_stdev_iters(km_iters, num_runs, &mean_iters, &stdev_iters);
-			calc_mean_stdev_objs(km_obj, num_runs, &mean_objs, &stdev_objs);
-			fprintf(fp, "bkm: %.6g, %.6g, %.4g, %.4g\n", mean_objs, stdev_objs, mean_iters, stdev_iters);
+			calc_mean_stdev(km_iters, num_runs, &mean_iters, &stdev_iters);
+			calc_mean_stdev(km_obj, num_runs, &mean_objs, &stdev_objs);
+			fprintf(fp, "bkm: %.6f, %.6f, %.2f, %.2f\n", mean_objs, stdev_objs, mean_iters, stdev_iters);
 
 			//b. Calculate the mean/stdev of iters and objs for bng
-			calc_mean_stdev_iters(bng_iters, num_runs, &mean_iters, &stdev_iters);
-			calc_mean_stdev_objs(bng_obj, num_runs, &mean_objs, &stdev_objs);
-			fprintf(fp, "bng: %.6g, %.6g, %.4g, %.4g\n", mean_objs, stdev_objs, mean_iters, stdev_iters);
+			calc_mean_stdev(bng_iters, num_runs, &mean_iters, &stdev_iters);
+			calc_mean_stdev(bng_obj, num_runs, &mean_objs, &stdev_objs);
+			fprintf(fp, "bng: %.6f, %.6f, %.2f, %.2f\n", mean_objs, stdev_objs, mean_iters, stdev_iters);
 		}
 	}
 	fprintf(fp, "\n------------------Finished running--------------------\n\n");

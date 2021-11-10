@@ -1,0 +1,3 @@
+4.2.03.ppm, 4.2.04.ppm, 4.2.07.ppm, fish.ppm, goldhill.ppm, kodim05ppm, kodim23.ppm, lenna.ppm, pills.ppm
+32, 64, 128, 256
+10

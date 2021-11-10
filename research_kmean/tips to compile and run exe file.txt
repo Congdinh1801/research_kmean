@@ -1,5 +1,5 @@
 to compile test.exe: 
-g++ batch_neural_gas.cpp -o test.exe
+g++ -O3 batch_neural_gas.cpp -o test.exe
 
 to run test.exe: 
 test.exe "experiment_file.txt"
