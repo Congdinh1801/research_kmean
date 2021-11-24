@@ -15,7 +15,7 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="batch_neural_gas.cpp">
+    <ClCompile Include="fast_map_pixel.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
